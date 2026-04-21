@@ -359,6 +359,34 @@
     z-index: 20; padding: 0 12px; height: 56px;
     align-items: center; gap: 4px; overflow-x: auto;
   }
+    padding: 10px 20px 14px;
+    border-bottom: 0.5px solid var(--border);
+    margin-bottom: 10px;
+  }
+  .changes-empty { font-size: 14px; color: var(--text3); padding: 2rem; text-align: center; }
+  .change-item { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 8px; }
+  .change-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .change-dot.add { background: var(--accent); }
+  .change-dot.edit { background: var(--warn); }
+  .change-dot.delete { background: var(--danger); }
+  .change-dot.pause { background: #888; }
+  .change-body { flex: 1; }
+  .change-title { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+  .change-desc { font-size: 12px; color: var(--text2); }
+  .change-time { font-size: 11px; color: var(--text3); margin-top: 3px; }
+  .badge-count { display: inline-block; background: var(--danger); color: white; font-size: 10px; font-weight: 700; border-radius: 10px; padding: 1px 6px; margin-left: 4px; vertical-align: middle; }
+  .changes-empty { font-size: 14px; color: var(--text3); padding: 2rem; text-align: center; }
+  .change-item { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 8px; }
+  .change-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .change-dot.add { background: #1D9E75; }
+  .change-dot.edit { background: #BA7517; }
+  .change-dot.delete { background: #A32D2D; }
+  .change-dot.pause { background: #888; }
+  .change-body { flex: 1; }
+  .change-title { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+  .change-desc { font-size: 12px; color: var(--text2); }
+  .change-time { font-size: 11px; color: var(--text3); margin-top: 3px; }
+  .badge-count { display: inline-block; background: #A32D2D; color: white; font-size: 10px; font-weight: 700; border-radius: 10px; padding: 1px 6px; margin-left: 4px; vertical-align: middle; }
   .top-nav-logo { font-size: 13px; font-weight: 700; color: var(--accent); margin-right: 8px; white-space: nowrap; flex-shrink: 0; }
   .top-nav-item { padding: 6px 12px; font-size: 12px; border-radius: var(--radius); border: none; background: none; cursor: pointer; color: var(--text2); white-space: nowrap; flex-shrink: 0; font-family: inherit; }
   .top-nav-item.active { background: var(--accent-light); color: var(--accent-dark); font-weight: 500; }
@@ -560,6 +588,7 @@
       saveDemo();
       renderCalendar(); renderCustomers();
     }
+    logChange("add", data.name, "신규 고객 등록");
   }
 
   async function updateCustomer(id, data) {
@@ -592,7 +621,9 @@
     if (name === "calendar") renderCalendar();
     if (name === "monthly") renderMonthly();
     if (name === "customers") renderCustomers();
+    if (name === "changes") renderChanges();
     if (name === "add") initForm();
+    updateChangeBadge();
   };
 
   // ── Monthly calendar ──────────────────────────────────────────────────────
@@ -847,9 +878,11 @@
   window.saveEdit = async function() {
     const nextDate = $("modal-date").value;
     const cycle = parseInt($("modal-cycle").value) || 7;
+    const c = customers.find(x => x.id === editingId);
     setLoading(true);
     try {
       await updateCustomer(editingId, { nextDate, cycle });
+      if (c) logChange("edit", c.name, "배송일 변경 → " + nextDate);
       closeModal();
       showToast("저장됐어요");
     } catch (e) {
@@ -863,7 +896,9 @@
     if (!c) return;
     setLoading(true);
     try {
-      await updateCustomer(id, { active: !c.active });
+      const newActive = !c.active;
+      await updateCustomer(id, { active: newActive });
+      logChange("pause", c.name, newActive ? "배송 재개" : "배송 일시정지");
       showToast(c.active ? "배송 일시정지" : "배송 재개");
     } catch (e) {
       showToast("오류: " + e.message, "err");
@@ -876,9 +911,12 @@
   };
 
   async function doDelete(id) {
+    const c = customers.find(x => x.id === id);
+    const name = c ? c.name : "고객";
     setLoading(true);
     try {
       await deleteCustomer(id);
+      logChange("delete", name, "고객 삭제");
       showToast("삭제됐어요");
     } catch (e) {
       showToast("삭제 오류: " + e.message, "err");
@@ -888,6 +926,81 @@
   // ── Search ────────────────────────────────────────────────────────────────
   window.onSearchInput = function() { renderCustomers(); };
 
+  // ── DateTime clock ───────────────────────────────────────────────────────
+
+  function todayKey() { return new Date().toISOString().slice(0,10); }
+
+  function loadChanges() {
+    try {
+      const raw = localStorage.getItem(CHANGES_KEY);
+      if (!raw) return [];
+      const all = JSON.parse(raw);
+      return all.filter(c => c.date === todayKey());
+    } catch { return []; }
+  }
+
+  function logChange(type, name, desc) {
+    try {
+      const raw = localStorage.getItem(CHANGES_KEY);
+      const all = raw ? JSON.parse(raw) : [];
+      // 오늘 것만 최대 200개 보관
+      const filtered = all.filter(c => c.date === todayKey()).slice(-199);
+      const now = new Date();
+      filtered.push({
+        date: todayKey(),
+        type, name, desc,
+        time: now.toTimeString().slice(0,8)
+      });
+      localStorage.setItem(CHANGES_KEY, JSON.stringify(filtered));
+      updateChangeBadge();
+    } catch {}
+  }
+
+  function updateChangeBadge() {
+    const changes = loadChanges();
+    const navItems = document.querySelectorAll('[data-tab="changes"]');
+    navItems.forEach(el => {
+      const existing = el.querySelector(".badge-count");
+      if (existing) existing.remove();
+      if (changes.length > 0) {
+        const badge = document.createElement("span");
+        badge.className = "badge-count";
+        badge.textContent = changes.length;
+        el.appendChild(badge);
+      }
+    });
+  }
+
+  function renderChanges() {
+    const changes = loadChanges();
+    const list = $("changes-list");
+    const dateEl = $("changes-date");
+    if (dateEl) dateEl.textContent = todayKey() + " 변경 내역";
+    if (!list) return;
+    if (changes.length === 0) {
+      list.innerHTML = `<div class="changes-empty">오늘 변경사항이 없어요</div>`;
+      return;
+    }
+    const typeMap = { add: { label: "등록", cls: "add" }, edit: { label: "수정", cls: "edit" }, delete: { label: "삭제", cls: "delete" }, pause: { label: "상태", cls: "pause" } };
+    list.innerHTML = [...changes].reverse().map(c => {
+      const t = typeMap[c.type] || { label: c.type, cls: "edit" };
+      return `<div class="change-item">
+        <div class="change-dot ${t.cls}"></div>
+        <div class="change-body">
+          <div class="change-title">${c.name}</div>
+          <div class="change-desc">${c.desc}</div>
+          <div class="change-time">${c.time}</div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  window.clearChanges = function() {
+    if (!confirm("오늘 변경 기록을 지울까요?")) return;
+    localStorage.removeItem(CHANGES_KEY);
+    renderChanges();
+    updateChangeBadge();
+  };
   // ── Init ──────────────────────────────────────────────────────────────────
   document.addEventListener("DOMContentLoaded", () => {
     if (IS_DEMO) {
@@ -899,6 +1012,7 @@
     }
     initForm();
     renderCalendar();
+    updateChangeBadge();
   });
 </script>
 
@@ -910,6 +1024,7 @@
   <button class="top-nav-item active" data-tab="calendar" onclick="switchTab('calendar')">📅 주간</button>
   <button class="top-nav-item" data-tab="monthly" onclick="switchTab('monthly')">🗓️ 월간</button>
   <button class="top-nav-item" data-tab="customers" onclick="switchTab('customers')">👥 고객</button>
+  <button class="top-nav-item" data-tab="changes" onclick="switchTab('changes')">🔔 변경</button>
   <button class="top-nav-item" data-tab="add" onclick="switchTab('add')">➕ 등록</button>
 </nav>
 
@@ -926,6 +1041,9 @@
     </div>
     <div class="nav-item" data-tab="customers" onclick="switchTab('customers')">
       <span class="nav-icon">👥</span> 고객 목록
+    </div>
+    <div class="nav-item" data-tab="changes" onclick="switchTab('changes')">
+      <span class="nav-icon">🔔</span> 변경사항
     </div>
     <div class="nav-item" data-tab="add" onclick="switchTab('add')">
       <span class="nav-icon">➕</span> 신규 등록
@@ -968,6 +1086,26 @@
         </div>
       </div>
       <div id="monthly-grid"></div>
+    </div>
+
+    <!-- Changes tab -->
+    <div id="tab-changes" class="section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div class="page-title" style="margin-bottom:0;">오늘 변경사항</div>
+        <button class="btn" onclick="clearChanges()">기록 지우기</button>
+      </div>
+      <div id="changes-date" style="font-size:13px;color:var(--text3);margin-bottom:16px;"></div>
+      <div id="changes-list"></div>
+    </div>
+
+    <!-- Changes tab -->
+    <div id="tab-changes" class="section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div class="page-title" style="margin-bottom:0;">오늘 변경사항</div>
+        <button class="btn" onclick="clearChanges()">기록 지우기</button>
+      </div>
+      <div id="changes-date" style="font-size:13px;color:var(--text3);margin-bottom:16px;"></div>
+      <div id="changes-list"></div>
     </div>
 
     <!-- Customers tab -->
