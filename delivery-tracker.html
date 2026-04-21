@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>정기배송 트래커</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --accent: #1D9E75;
+    --accent-light: #E1F5EE;
+    --accent-mid: #5DCAA5;
+    --accent-dark: #085041;
+    --warn-light: #FAEEDA;
+    --warn: #BA7517;
+    --danger: #A32D2D;
+    --danger-light: #FCEBEB;
+    --bg: #f8f9f7;
+    --surface: #ffffff;
+    --surface2: #f3f4f2;
+    --border: rgba(0,0,0,0.08);
+    --border-strong: rgba(0,0,0,0.15);
+    --text: #1a1a18;
+    --text2: #5a5a56;
+    --text3: #9a9a96;
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* Layout */
+  .layout { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 220px;
+    background: var(--surface);
+    border-right: 0.5px solid var(--border);
+    padding: 24px 0;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    display: flex; flex-direction: column;
+    z-index: 10;
+  }
+
+  .logo {
+    padding: 0 20px 24px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent);
+    border-bottom: 0.5px solid var(--border);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .logo-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; }
+
+  .nav-item {
+    padding: 10px 20px;
+    font-size: 13px;
+    color: var(--text2);
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    display: flex; align-items: center; gap: 10px;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-light); font-weight: 500; }
+  .nav-icon { font-size: 15px; width: 18px; text-align: center; }
+
+  .sync-status {
+    margin-top: auto;
+    padding: 12px 20px;
+    font-size: 11px;
+    color: var(--text3);
+    border-top: 0.5px solid var(--border);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); }
+  .sync-dot.ok { background: var(--accent); }
+  .sync-dot.err { background: var(--danger); }
+
+  .main {
+    margin-left: 220px;
+    flex: 1;
+    padding: 28px;
+    max-width: 1000px;
+  }
+
+  /* Sections */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* Page title */
+  .page-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+
+  /* Summary bar */
+  .summary-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .stat-label { font-size: 11px; color: var(--text3); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-val { font-size: 26px; font-weight: 700; }
+  .stat-val.accent { color: var(--accent); }
+
+  /* Week grid */
+  .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+  .day-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+    min-height: 110px;
+  }
+  .day-card.today { border-color: var(--accent); border-width: 1.5px; }
+  .day-weekday { font-size: 10px; color: var(--text3); margin-bottom: 2px; }
+  .day-date { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+  .day-card.today .day-date { color: var(--accent); }
+  .delivery-chip {
+    background: var(--accent-light);
+    border-radius: 5px;
+    padding: 5px 7px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .delivery-chip:hover { background: #9FE1CB; }
+  .chip-name { font-size: 11px; font-weight: 500; color: var(--accent-dark); }
+  .chip-goods { font-size: 10px; color: #0F6E56; margin-top: 1px; line-height: 1.4; }
+  .no-delivery { font-size: 11px; color: var(--text3); }
+
+  /* Search */
+  .search-wrap { display: flex; gap: 8px; margin-bottom: 16px; }
+  .search-input {
+    flex: 1; padding: 10px 14px; font-size: 14px;
+    border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius); background: var(--surface);
+    color: var(--text); font-family: inherit;
+    transition: border-color 0.15s;
+  }
+  .search-input:focus { outline: none; border-color: var(--accent); }
+
+  /* Customer list */
+  .customer-list { display: flex; flex-direction: column; gap: 10px; }
+  .cust-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    transition: box-shadow 0.15s;
+  }
+  .cust-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .cust-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .cust-name { font-size: 15px; font-weight: 700; }
+  .cust-phone { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .badge { display: inline-block; font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 500; }
+  .badge-on { background: var(--accent-light); color: var(--accent-dark); }
+  .badge-off { background: var(--warn-light); color: #633806; }
+  .cust-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; font-size: 12px; margin-bottom: 12px; }
+  .cust-grid-label { color: var(--text3); white-space: nowrap; }
+  .cust-grid-val { color: var(--text); }
+  .next-box {
+    background: var(--accent-light);
+    border-radius: var(--radius);
+    padding: 9px 12px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; margin-bottom: 12px;
+  }
+  .next-box-label { color: #0F6E56; font-weight: 500; }
+  .next-box-date { font-weight: 700; font-size: 13px; color: var(--accent-dark); }
+  .cust-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .btn {
+    padding: 6px 13px; font-size: 12px; border-radius: var(--radius);
+    border: 0.5px solid var(--border-strong); background: none;
+    cursor: pointer; color: var(--text); font-family: inherit;
+    transition: background 0.12s;
+  }
+  .btn:hover { background: var(--surface2); }
+  .btn-danger { color: var(--danger); border-color: var(--danger); }
+  .btn-danger:hover { background: var(--danger-light); }
+  .btn-primary { background: var(--accent); color: white; border-color: var(--accent); font-weight: 500; }
+  .btn-primary:hover { background: #0F6E56; }
+
+  /* Form */
+  .form-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 24px; max-width: 600px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-group label { font-size: 12px; font-weight: 500; color: var(--text2); }
+  .form-group input, .form-group select {
+    padding: 9px 11px; font-size: 14px;
+    border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius); background: var(--surface);
+    color: var(--text); font-family: inherit;
+  }
+  .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
+  .goods-section { margin-bottom: 16px; }
+  .goods-section label { font-size: 12px; font-weight: 500; color: var(--text2); display: block; margin-bottom: 8px; }
+  .goods-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .goods-row input { flex: 2; padding: 8px 10px; font-size: 13px; border: 0.5px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); font-family: inherit; }
+  .goods-row input.qty { flex: 1; }
+  .goods-row input.unit { flex: 0.8; }
+  .goods-row input:focus { outline: none; border-color: var(--accent); }
+  .remove-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: none; background: none; cursor: pointer; color: var(--text3); font-size: 18px; border-radius: 50%; }
+  .remove-btn:hover { background: var(--danger-light); color: var(--danger); }
+  .add-goods-btn {
+    width: 100%; padding: 8px; font-size: 13px;
+    border: 0.5px dashed var(--border-strong);
+    border-radius: var(--radius); background: none;
+    cursor: pointer; color: var(--text3); font-family: inherit;
+  }
+  .add-goods-btn:hover { background: var(--surface2); color: var(--text); }
+
+  /* Modal */
+  .overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35); z-index: 50;
+    align-items: center; justify-content: center;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border-radius: var(--radius-lg);
+    border: 0.5px solid var(--border); padding: 24px;
+    width: 380px; max-width: 95vw;
+  }
+  .modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
+  .modal .form-group { margin-bottom: 14px; }
+  .modal label { font-size: 12px; font-weight: 500; color: var(--text2); display: block; margin-bottom: 5px; }
+  .modal input {
+    width: 100%; padding: 9px 11px; font-size: 14px;
+    border: 0.5px solid var(--border-strong); border-radius: var(--radius);
+    background: var(--surface); color: var(--text); font-family: inherit;
+  }
+  .modal input:focus { outline: none; border-color: var(--accent); }
+  .modal input[readonly] { background: var(--surface2); color: var(--text2); }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #2C2C2A; color: #F1EFE8;
+    padding: 11px 18px; border-radius: var(--radius);
+    font-size: 13px; z-index: 100;
+    opacity: 0; transform: translateY(8px);
+    transition: opacity 0.25s, transform 0.25s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  /* Config notice */
+  .config-notice {
+    background: #FAEEDA; border: 0.5px solid #BA7517;
+    border-radius: var(--radius); padding: 14px 16px;
+    font-size: 13px; margin-bottom: 20px; display: none;
+  }
+  .config-notice.visible { display: block; }
+  .config-notice strong { color: #633806; }
+
+  /* Loading */
+  .loading-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(255,255,255,0.7); z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  .loading-overlay.show { display: flex; }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--accent-light);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Responsive */
+  @media (max-width: 720px) {
+    .sidebar { display: none; }
+    .main { margin-left: 0; padding: 16px; }
+    .week-grid { grid-template-columns: repeat(4, 1fr); }
+    .form-grid { grid-template-columns: 1fr; }
+    .summary-bar { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ====================================================
+     🔧 FIREBASE 설정 — 아래 값을 실제 Firebase 프로젝트 설정값으로 교체하세요
+     Firebase Console → 프로젝트 설정 → 내 앱 → SDK 설정 및 구성
+     ==================================================== -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import {
+    getFirestore, collection, doc,
+    addDoc, updateDoc, deleteDoc,
+    onSnapshot, query, orderBy
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyBn2DaV51NU3pHOulOWCl--bcifSTWErac",
+    authDomain:        "delivery-4aef4.firebaseapp.com",
+    projectId:         "delivery-4aef4",
+    storageBucket:     "delivery-4aef4.firebasestorage.app",
+    messagingSenderId: "284197926346",
+    appId:             "1:284197926346:web:ad79742c0a9ee582c3cb33",
+    measurementId:     "G-6Y28VX0Q9R"
+  };
+
+  const IS_DEMO = firebaseConfig.apiKey === "YOUR_API_KEY";
+
+  // ── App init ──────────────────────────────────────────────────────────────
+  let app, db, unsubscribe;
+  let customers = [];
+  let editingId = null;
+
+  if (!IS_DEMO) {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const dateStr = d => d.toISOString().slice(0, 10);
+  const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+  const parseDate = s => new Date(s + "T00:00:00");
+  const DAYS = ["일","월","화","수","목","금","토"];
+
+  function showToast(msg, type = "normal") {
+    const t = $("toast");
+    t.textContent = msg;
+    t.style.background = type === "err" ? "#A32D2D" : "#2C2C2A";
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2800);
+  }
+
+  function setSyncStatus(state) {
+    const dot = $("sync-dot");
+    const label = $("sync-label");
+    dot.className = "sync-dot " + (state === "ok" ? "ok" : state === "err" ? "err" : "");
+    label.textContent = state === "ok" ? "실시간 연결됨" : state === "err" ? "연결 오류" : "연결 중...";
+  }
+
+  function setLoading(show) {
+    $("loading").classList.toggle("show", show);
+  }
+
+  // ── Delivery logic ────────────────────────────────────────────────────────
+  function getDeliveriesForDate(c, ds) {
+    if (!c.active) return false;
+    const start = parseDate(c.startDate);
+    const target = parseDate(ds);
+    if (target < start) return false;
+    if (c.nextDate) {
+      if (c.nextDate === ds) return true;
+      const nd = parseDate(c.nextDate);
+      if (target <= nd) return false;
+      const diff = Math.round((target - nd) / 86400000);
+      return diff > 0 && diff % c.cycle === 0;
+    }
+    const diff = Math.round((target - start) / 86400000);
+    return diff >= 0 && diff % c.cycle === 0;
+  }
+
+  function getNextDelivery(c) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    for (let i = 0; i <= 365; i++) {
+      const ds = dateStr(addDays(today, i));
+      if (getDeliveriesForDate(c, ds)) return ds;
+    }
+    return null;
+  }
+
+  // ── Firestore realtime ────────────────────────────────────────────────────
+  function startRealtimeSync() {
+    if (!db) return;
+    setSyncStatus("connecting");
+    const q = query(collection(db, "customers"), orderBy("createdAt", "asc"));
+    unsubscribe = onSnapshot(q,
+      snapshot => {
+        customers = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setSyncStatus("ok");
+        renderCalendar();
+        renderCustomers();
+      },
+      err => {
+        console.error(err);
+        setSyncStatus("err");
+        showToast("Firebase 연결 오류: " + err.message, "err");
+      }
+    );
+  }
+
+  // Demo mode: use localStorage
+  function loadDemo() {
+    try { customers = JSON.parse(localStorage.getItem("dt_demo") || "[]"); } catch { customers = []; }
+    renderCalendar(); renderCustomers();
+  }
+  function saveDemo() {
+    localStorage.setItem("dt_demo", JSON.stringify(customers));
+  }
+
+  // ── CRUD ──────────────────────────────────────────────────────────────────
+  async function addCustomer(data) {
+    data.createdAt = Date.now();
+    if (db) {
+      await addDoc(collection(db, "customers"), data);
+    } else {
+      data.id = Date.now().toString(36);
+      customers.push(data);
+      saveDemo();
+      renderCalendar(); renderCustomers();
+    }
+  }
+
+  async function updateCustomer(id, data) {
+    if (db) {
+      await updateDoc(doc(db, "customers", id), data);
+    } else {
+      const i = customers.findIndex(c => c.id === id);
+      if (i >= 0) { customers[i] = { ...customers[i], ...data }; saveDemo(); }
+      renderCalendar(); renderCustomers();
+    }
+  }
+
+  async function deleteCustomer(id) {
+    if (db) {
+      await deleteDoc(doc(db, "customers", id));
+    } else {
+      customers = customers.filter(c => c.id !== id);
+      saveDemo();
+      renderCalendar(); renderCustomers();
+    }
+  }
+
+  // ── Tab navigation ────────────────────────────────────────────────────────
+  window.switchTab = function(name) {
+    document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+    document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+    $("tab-" + name).classList.add("active");
+    document.querySelector(`[data-tab="${name}"]`).classList.add("active");
+    if (name === "calendar") renderCalendar();
+    if (name === "customers") renderCustomers();
+    if (name === "add") initForm();
+  };
+
+  // ── Calendar ──────────────────────────────────────────────────────────────
+  function renderCalendar() {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const grid = $("week-grid");
+    grid.innerHTML = "";
+    let todayCnt = 0, weekCnt = 0;
+
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(today, i);
+      const ds = dateStr(d);
+      const isToday = i === 0;
+      const del = customers.filter(c => getDeliveriesForDate(c, ds));
+      if (isToday) todayCnt = del.length;
+      weekCnt += del.length;
+
+      const card = document.createElement("div");
+      card.className = "day-card" + (isToday ? " today" : "");
+      let html = `<div class="day-weekday">${DAYS[d.getDay()]}요일</div>
+                  <div class="day-date">${d.getMonth()+1}/${d.getDate()}</div>`;
+      if (del.length === 0) {
+        html += `<div class="no-delivery">배송 없음</div>`;
+      } else {
+        del.forEach(c => {
+          const goods = c.goods.map(g => `${g.name} ${g.qty}${g.unit}`).join(", ");
+          html += `<div class="delivery-chip" onclick="openEdit('${c.id}')">
+            <div class="chip-name">${c.name}</div>
+            <div class="chip-goods">${goods}</div>
+          </div>`;
+        });
+      }
+      card.innerHTML = html;
+      grid.appendChild(card);
+    }
+
+    $("stat-today").textContent = todayCnt + "건";
+    $("stat-week").textContent = weekCnt + "건";
+    $("stat-active").textContent = customers.filter(c => c.active).length + "명";
+  }
+
+  // ── Customer list ─────────────────────────────────────────────────────────
+  function renderCustomers() {
+    const q = ($("search-input").value || "").trim().toLowerCase();
+    const list = $("customer-list");
+    let filtered = q
+      ? customers.filter(c => c.name.toLowerCase().includes(q) || c.phone.includes(q))
+      : [...customers];
+
+    if (filtered.length === 0) {
+      list.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--text3);font-size:14px;">${q ? "검색 결과 없음" : "등록된 고객이 없어요"}</div>`;
+      return;
+    }
+
+    list.innerHTML = filtered.map(c => {
+      const next = getNextDelivery(c);
+      const goods = c.goods.map(g => `${g.name} ${g.qty}${g.unit}`).join(" / ");
+      return `<div class="cust-card">
+        <div class="cust-header">
+          <div>
+            <div class="cust-name">${c.name}</div>
+            <div class="cust-phone">${c.phone}</div>
+          </div>
+          <span class="badge ${c.active ? "badge-on" : "badge-off"}">${c.active ? "배송중" : "일시정지"}</span>
+        </div>
+        <div class="cust-grid">
+          <span class="cust-grid-label">주소</span><span class="cust-grid-val">${c.address}</span>
+          <span class="cust-grid-label">상품</span><span class="cust-grid-val">${goods}</span>
+          <span class="cust-grid-label">발송 주기</span><span class="cust-grid-val">${c.cycle}일마다</span>
+          <span class="cust-grid-label">시작일</span><span class="cust-grid-val">${c.startDate}</span>
+        </div>
+        ${next ? `<div class="next-box"><span class="next-box-label">다음 배송일</span><span class="next-box-date">${next}</span></div>` : ""}
+        <div class="cust-actions">
+          <button class="btn" onclick="openEdit('${c.id}')">배송일 변경</button>
+          <button class="btn" onclick="toggleActive('${c.id}')">${c.active ? "일시정지" : "배송 재개"}</button>
+          <button class="btn btn-danger" onclick="confirmDelete('${c.id}', '${c.name}')">삭제</button>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  // ── Form ──────────────────────────────────────────────────────────────────
+  let goodsCnt = 0;
+  function initForm() {
+    $("f-name").value = "";
+    $("f-phone").value = "";
+    $("f-addr").value = "";
+    $("f-start").value = dateStr(new Date());
+    $("f-cycle").value = 7;
+    $("goods-rows").innerHTML = "";
+    goodsCnt = 0;
+    addGoodsRow();
+  }
+
+  window.addGoodsRow = function() {
+    goodsCnt++;
+    const id = "gr" + goodsCnt;
+    const div = document.createElement("div");
+    div.className = "goods-row"; div.id = id;
+    div.innerHTML = `
+      <input type="text" placeholder="상품명" class="gname">
+      <input type="number" placeholder="수량" class="qty" min="1" value="1">
+      <input type="text" placeholder="단위(개/kg)" class="unit">
+      <button class="remove-btn" onclick="document.getElementById('${id}').remove()" title="삭제">×</button>`;
+    $("goods-rows").appendChild(div);
+  };
+
+  window.submitCustomer = async function() {
+    const name = $("f-name").value.trim();
+    const phone = $("f-phone").value.trim();
+    const address = $("f-addr").value.trim();
+    const startDate = $("f-start").value;
+    const cycle = parseInt($("f-cycle").value) || 7;
+    if (!name || !phone || !address || !startDate) { showToast("필수 항목을 모두 입력해주세요", "err"); return; }
+    const rows = document.querySelectorAll(".goods-row");
+    const goods = [];
+    rows.forEach(row => {
+      const n = row.querySelector(".gname").value.trim();
+      const qty = row.querySelector(".qty").value || "1";
+      const unit = row.querySelector(".unit").value.trim() || "개";
+      if (n) goods.push({ name: n, qty, unit });
+    });
+    if (goods.length === 0) { showToast("상품을 최소 1개 입력해주세요", "err"); return; }
+    setLoading(true);
+    try {
+      await addCustomer({ name, phone, address, startDate, cycle, goods, active: true, nextDate: null });
+      showToast(name + " 고객 등록 완료");
+      switchTab("calendar");
+    } catch (e) {
+      showToast("저장 오류: " + e.message, "err");
+    } finally { setLoading(false); }
+  };
+
+  // ── Edit modal ────────────────────────────────────────────────────────────
+  window.openEdit = function(id) {
+    editingId = id;
+    const c = customers.find(x => x.id === id);
+    if (!c) return;
+    $("modal-name").value = c.name;
+    $("modal-date").value = c.nextDate || getNextDelivery(c) || dateStr(new Date());
+    $("modal-cycle").value = c.cycle;
+    $("edit-overlay").classList.add("open");
+  };
+
+  window.closeModal = function() {
+    $("edit-overlay").classList.remove("open");
+    editingId = null;
+  };
+
+  window.saveEdit = async function() {
+    const nextDate = $("modal-date").value;
+    const cycle = parseInt($("modal-cycle").value) || 7;
+    setLoading(true);
+    try {
+      await updateCustomer(editingId, { nextDate, cycle });
+      closeModal();
+      showToast("저장됐어요");
+    } catch (e) {
+      showToast("저장 오류: " + e.message, "err");
+    } finally { setLoading(false); }
+  };
+
+  // ── Toggle / Delete ───────────────────────────────────────────────────────
+  window.toggleActive = async function(id) {
+    const c = customers.find(x => x.id === id);
+    if (!c) return;
+    setLoading(true);
+    try {
+      await updateCustomer(id, { active: !c.active });
+      showToast(c.active ? "배송 일시정지" : "배송 재개");
+    } catch (e) {
+      showToast("오류: " + e.message, "err");
+    } finally { setLoading(false); }
+  };
+
+  window.confirmDelete = function(id, name) {
+    if (!confirm(`"${name}" 고객을 삭제하시겠어요?`)) return;
+    doDelete(id);
+  };
+
+  async function doDelete(id) {
+    setLoading(true);
+    try {
+      await deleteCustomer(id);
+      showToast("삭제됐어요");
+    } catch (e) {
+      showToast("삭제 오류: " + e.message, "err");
+    } finally { setLoading(false); }
+  }
+
+  // ── Search ────────────────────────────────────────────────────────────────
+  window.onSearchInput = function() { renderCustomers(); };
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  document.addEventListener("DOMContentLoaded", () => {
+    if (IS_DEMO) {
+      $("config-notice").classList.add("visible");
+      setSyncStatus("err");
+      loadDemo();
+    } else {
+      startRealtimeSync();
+    }
+    initForm();
+    renderCalendar();
+  });
+</script>
+
+<!-- ── HTML ──────────────────────────────────────────────────────────────── -->
+<div class="layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="logo"><div class="logo-dot"></div>배송 트래커</div>
+    <div class="nav-item active" data-tab="calendar" onclick="switchTab('calendar')">
+      <span class="nav-icon">📅</span> 주간 캘린더
+    </div>
+    <div class="nav-item" data-tab="customers" onclick="switchTab('customers')">
+      <span class="nav-icon">👥</span> 고객 목록
+    </div>
+    <div class="nav-item" data-tab="add" onclick="switchTab('add')">
+      <span class="nav-icon">➕</span> 신규 등록
+    </div>
+    <div class="sync-status">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span id="sync-label">연결 중...</span>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- Config notice (demo mode) -->
+    <div class="config-notice" id="config-notice">
+      <strong>⚠ Firebase 미설정 상태입니다.</strong>
+      HTML 파일 상단의 <code>firebaseConfig</code> 값을 교체하면 실시간 연동이 활성화됩니다.
+      현재는 이 브라우저 로컬에만 저장됩니다.
+    </div>
+
+    <!-- Calendar tab -->
+    <div id="tab-calendar" class="section active">
+      <div class="page-title">주간 배송 현황</div>
+      <div class="summary-bar">
+        <div class="stat-card"><div class="stat-label">오늘 배송</div><div class="stat-val accent" id="stat-today">0건</div></div>
+        <div class="stat-card"><div class="stat-label">이번 주 총 배송</div><div class="stat-val" id="stat-week">0건</div></div>
+        <div class="stat-card"><div class="stat-label">활성 고객</div><div class="stat-val" id="stat-active">0명</div></div>
+      </div>
+      <div class="week-grid" id="week-grid"></div>
+    </div>
+
+    <!-- Customers tab -->
+    <div id="tab-customers" class="section">
+      <div class="page-title">고객 목록</div>
+      <div class="search-wrap">
+        <input type="text" class="search-input" id="search-input" placeholder="고객명 또는 전화번호 검색" oninput="onSearchInput()">
+      </div>
+      <div class="customer-list" id="customer-list"></div>
+    </div>
+
+    <!-- Add tab -->
+    <div id="tab-add" class="section">
+      <div class="page-title">신규 고객 등록</div>
+      <div class="form-card">
+        <div class="form-grid">
+          <div class="form-group"><label>고객명 *</label><input type="text" id="f-name" placeholder="홍길동"></div>
+          <div class="form-group"><label>전화번호 *</label><input type="text" id="f-phone" placeholder="010-0000-0000"></div>
+          <div class="form-group full"><label>주소 *</label><input type="text" id="f-addr" placeholder="배송 주소"></div>
+          <div class="form-group"><label>시작일 *</label><input type="date" id="f-start"></div>
+          <div class="form-group"><label>발송 주기 (일) *</label><input type="number" id="f-cycle" min="1" value="7"></div>
+        </div>
+        <div class="goods-section">
+          <label>주문 상품 *</label>
+          <div id="goods-rows"></div>
+          <button class="add-goods-btn" onclick="addGoodsRow()">+ 상품 추가</button>
+        </div>
+        <button class="btn btn-primary" onclick="submitCustomer()" style="width:100%;padding:11px;">등록하기</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Edit modal -->
+<div class="overlay" id="edit-overlay">
+  <div class="modal">
+    <h3>배송 일정 변경</h3>
+    <div class="form-group"><label>고객명</label><input type="text" id="modal-name" readonly></div>
+    <div class="form-group"><label>다음 배송일</label><input type="date" id="modal-date"></div>
+    <div class="form-group"><label>발송 주기 (일)</label><input type="number" id="modal-cycle" min="1"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveEdit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast & Loading -->
+<div class="toast" id="toast"></div>
+<div class="loading-overlay" id="loading"><div class="spinner"></div></div>
+
+</body>
+</html>
