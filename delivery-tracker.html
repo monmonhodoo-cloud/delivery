@@ -280,13 +280,83 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Responsive */
-  @media (max-width: 720px) {
+  /* Monthly calendar */
+  .month-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .month-header-cell {
+    background: var(--surface2);
+    padding: 8px 4px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text3);
+  }
+  .month-cell {
+    background: var(--surface);
+    min-height: 90px;
+    padding: 6px;
+    vertical-align: top;
+  }
+  .month-cell.other-month { background: var(--surface2); }
+  .month-cell.today { background: #f0fdf8; }
+  .month-day-num {
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+  }
+  .month-cell.today .month-day-num {
+    background: var(--accent);
+    color: white;
+  }
+  .month-cell.sun .month-day-num { color: #A32D2D; }
+  .month-cell.sat .month-day-num { color: #185FA5; }
+  .month-chip {
+    background: var(--accent-light);
+    border-radius: 3px;
+    padding: 2px 5px;
+    font-size: 10px;
+    color: var(--accent-dark);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  .month-chip:hover { background: #9FE1CB; }
+  .month-more {
+    font-size: 10px;
+    color: var(--text3);
+    margin-top: 2px;
+    cursor: pointer;
+  }
+
+  .cycle-type-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .cycle-tab { flex: 1; padding: 7px 4px; font-size: 12px; border: 0.5px solid var(--border-strong); border-radius: var(--radius); background: none; cursor: pointer; color: var(--text2); font-family: inherit; text-align: center; }
+  .cycle-tab.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent-dark); font-weight: 500; }
+  .cycle-panel { display: none; }
+  .cycle-panel.active { display: block; }
+  .weekday-checks { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .weekday-btn { width: 36px; height: 36px; border-radius: 50%; border: 0.5px solid var(--border-strong); background: none; cursor: pointer; font-size: 12px; color: var(--text2); font-family: inherit; }
+  .weekday-btn.active { background: var(--accent); border-color: var(--accent); color: white; font-weight: 500; }
+  .nth-row { display: flex; gap: 8px; margin-top: 6px; }
+  .nth-row select { flex: 1; padding: 8px 10px; font-size: 13px; border: 0.5px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); font-family: inherit; }
+  .nth-row select:focus { outline: none; border-color: var(--accent); }
     .sidebar { display: none; }
     .main { margin-left: 0; padding: 16px; }
     .week-grid { grid-template-columns: repeat(4, 1fr); }
     .form-grid { grid-template-columns: 1fr; }
     .summary-bar { grid-template-columns: 1fr 1fr; }
+    .month-cell { min-height: 60px; }
   }
 </style>
 </head>
@@ -353,29 +423,87 @@
   }
 
   // ── Delivery logic ────────────────────────────────────────────────────────
-  function getDeliveriesForDate(c, ds) {
+  // cycleType: "days" | "weekly" | "monthly_weekday"
+  // days: N일마다
+  // weekly: 매주 특정 요일(들) — weekdays: [0,1,...] (0=일)
+  // monthly_weekday: 매달 N번째 요일 — weekNth: 1~5(-1=마지막), weekDay: 0~6
+
+  function getNthWeekdayOfMonth(year, month, nth, weekday) {
+    // nth: 1~4, weekday: 0=일~6=토
+    // nth=-1이면 마지막
+    if (nth === -1) {
+      const last = new Date(year, month + 1, 0);
+      const diff = (weekday - last.getDay() + 7) % 7;
+      return new Date(year, month, last.getDate() - diff);
+    }
+    const first = new Date(year, month, 1);
+    const diff = (weekday - first.getDay() + 7) % 7;
+    const date = 1 + diff + (nth - 1) * 7;
+    if (date > new Date(year, month + 1, 0).getDate()) return null;
+    return new Date(year, month, date);
+  }
+
+  function isDeliveryDay(c, ds) {
     if (!c.active) return false;
     const start = parseDate(c.startDate);
     const target = parseDate(ds);
     if (target < start) return false;
+
+    // 수동 변경일 우선 처리
     if (c.nextDate) {
       if (c.nextDate === ds) return true;
       const nd = parseDate(c.nextDate);
       if (target <= nd) return false;
-      const diff = Math.round((target - nd) / 86400000);
-      return diff > 0 && diff % c.cycle === 0;
+      // nextDate 이후로는 원래 주기로 복귀
+      return checkCycle(c, ds, nd);
     }
-    const diff = Math.round((target - start) / 86400000);
-    return diff >= 0 && diff % c.cycle === 0;
+    return checkCycle(c, ds, start);
   }
+
+  function checkCycle(c, ds, baseDate) {
+    const target = parseDate(ds);
+    const type = c.cycleType || "days";
+
+    if (type === "days") {
+      const diff = Math.round((target - baseDate) / 86400000);
+      return diff >= 0 && diff % (c.cycle || 7) === 0;
+    }
+    if (type === "weekly") {
+      const days = c.weekdays || [];
+      return days.includes(target.getDay());
+    }
+    if (type === "monthly_weekday") {
+      const d = getNthWeekdayOfMonth(target.getFullYear(), target.getMonth(), c.weekNth, c.weekDay);
+      return d && dateStr(d) === ds;
+    }
+    return false;
+  }
+
+  // 구버전 호환
+  function getDeliveriesForDate(c, ds) { return isDeliveryDay(c, ds); }
 
   function getNextDelivery(c) {
     const today = new Date(); today.setHours(0,0,0,0);
-    for (let i = 0; i <= 365; i++) {
+    for (let i = 0; i <= 400; i++) {
       const ds = dateStr(addDays(today, i));
-      if (getDeliveriesForDate(c, ds)) return ds;
+      if (isDeliveryDay(c, ds)) return ds;
     }
     return null;
+  }
+
+  function cycleLabel(c) {
+    const type = c.cycleType || "days";
+    const dayNames = ["일","월","화","수","목","금","토"];
+    if (type === "days") return `${c.cycle}일마다`;
+    if (type === "weekly") {
+      const days = (c.weekdays || []).map(d => dayNames[d] + "요일").join(", ");
+      return `매주 ${days}`;
+    }
+    if (type === "monthly_weekday") {
+      const nth = c.weekNth === -1 ? "마지막" : c.weekNth + "번째";
+      return `매달 ${nth} ${dayNames[c.weekDay]}요일`;
+    }
+    return "-";
   }
 
   // ── Firestore realtime ────────────────────────────────────────────────────
@@ -447,9 +575,80 @@
     $("tab-" + name).classList.add("active");
     document.querySelector(`[data-tab="${name}"]`).classList.add("active");
     if (name === "calendar") renderCalendar();
+    if (name === "monthly") renderMonthly();
     if (name === "customers") renderCustomers();
     if (name === "add") initForm();
   };
+
+  // ── Monthly calendar ──────────────────────────────────────────────────────
+  let monthOffset = 0;
+
+  window.changeMonth = function(dir) {
+    if (dir === 0) monthOffset = 0;
+    else monthOffset += dir;
+    renderMonthly();
+  };
+
+  function renderMonthly() {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const base = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+    const year = base.getFullYear();
+    const month = base.getMonth();
+
+    $("monthly-title").textContent = `${year}년 ${month + 1}월`;
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const lastDate = new Date(year, month + 1, 0).getDate();
+
+    let html = `<div class="month-grid">`;
+    const dayNames = ["일","월","화","수","목","금","토"];
+    dayNames.forEach(d => { html += `<div class="month-header-cell">${d}</div>`; });
+
+    // 이전달 빈칸
+    for (let i = 0; i < firstDay; i++) {
+      const prevDate = new Date(year, month, -firstDay + i + 1);
+      html += `<div class="month-cell other-month">
+        <div class="month-day-num" style="color:var(--text3)">${prevDate.getDate()}</div>
+      </div>`;
+    }
+
+    for (let d = 1; d <= lastDate; d++) {
+      const cellDate = new Date(year, month, d);
+      const ds = dateStr(cellDate);
+      const isToday = ds === dateStr(today);
+      const dow = cellDate.getDay();
+      const deliveries = customers.filter(c => getDeliveriesForDate(c, ds));
+      const dowClass = dow === 0 ? "sun" : dow === 6 ? "sat" : "";
+      const todayClass = isToday ? "today" : "";
+
+      html += `<div class="month-cell ${dowClass} ${todayClass}">
+        <div class="month-day-num">${d}</div>`;
+
+      const max = 2;
+      deliveries.slice(0, max).forEach(c => {
+        html += `<div class="month-chip" onclick="openEdit('${c.id}')" title="${c.name} | ${c.goods.map(g=>g.name+' '+g.qty+g.unit).join(', ')}">${c.name}</div>`;
+      });
+      if (deliveries.length > max) {
+        html += `<div class="month-more">+${deliveries.length - max}명 더</div>`;
+      }
+
+      html += `</div>`;
+    }
+
+    // 다음달 빈칸
+    const totalCells = firstDay + lastDate;
+    const remainder = totalCells % 7;
+    if (remainder > 0) {
+      for (let i = 1; i <= 7 - remainder; i++) {
+        html += `<div class="month-cell other-month">
+          <div class="month-day-num" style="color:var(--text3)">${i}</div>
+        </div>`;
+      }
+    }
+
+    html += `</div>`;
+    $("monthly-grid").innerHTML = html;
+  }
 
   // ── Calendar ──────────────────────────────────────────────────────────────
   function renderCalendar() {
@@ -517,7 +716,7 @@
         <div class="cust-grid">
           <span class="cust-grid-label">주소</span><span class="cust-grid-val">${c.address}</span>
           <span class="cust-grid-label">상품</span><span class="cust-grid-val">${goods}</span>
-          <span class="cust-grid-label">발송 주기</span><span class="cust-grid-val">${c.cycle}일마다</span>
+          <span class="cust-grid-label">발송 주기</span><span class="cust-grid-val">${cycleLabel(c)}</span>
           <span class="cust-grid-label">시작일</span><span class="cust-grid-val">${c.startDate}</span>
         </div>
         ${next ? `<div class="next-box"><span class="next-box-label">다음 배송일</span><span class="next-box-date">${next}</span></div>` : ""}
@@ -532,6 +731,8 @@
 
   // ── Form ──────────────────────────────────────────────────────────────────
   let goodsCnt = 0;
+  let selectedWeekdays = [];
+
   function initForm() {
     $("f-name").value = "";
     $("f-phone").value = "";
@@ -540,8 +741,21 @@
     $("f-cycle").value = 7;
     $("goods-rows").innerHTML = "";
     goodsCnt = 0;
+    selectedWeekdays = [];
+    setCycleTab("days");
     addGoodsRow();
   }
+
+  window.setCycleTab = function(type) {
+    document.querySelectorAll(".cycle-tab").forEach(b => b.classList.toggle("active", b.dataset.type === type));
+    document.querySelectorAll(".cycle-panel").forEach(p => p.classList.toggle("active", p.dataset.panel === type));
+  };
+
+  window.toggleWeekday = function(btn, day) {
+    const idx = selectedWeekdays.indexOf(day);
+    if (idx >= 0) { selectedWeekdays.splice(idx, 1); btn.classList.remove("active"); }
+    else { selectedWeekdays.push(day); btn.classList.add("active"); }
+  };
 
   window.addGoodsRow = function() {
     goodsCnt++;
@@ -561,8 +775,24 @@
     const phone = $("f-phone").value.trim();
     const address = $("f-addr").value.trim();
     const startDate = $("f-start").value;
-    const cycle = parseInt($("f-cycle").value) || 7;
     if (!name || !phone || !address || !startDate) { showToast("필수 항목을 모두 입력해주세요", "err"); return; }
+
+    // 주기 타입 파악
+    const activeTab = document.querySelector(".cycle-tab.active");
+    const cycleType = activeTab ? activeTab.dataset.type : "days";
+    let cycleData = { cycleType };
+
+    if (cycleType === "days") {
+      const cycle = parseInt($("f-cycle").value) || 7;
+      cycleData.cycle = cycle;
+    } else if (cycleType === "weekly") {
+      if (selectedWeekdays.length === 0) { showToast("요일을 최소 1개 선택해주세요", "err"); return; }
+      cycleData.weekdays = [...selectedWeekdays];
+    } else if (cycleType === "monthly_weekday") {
+      cycleData.weekNth = parseInt($("f-week-nth").value);
+      cycleData.weekDay = parseInt($("f-week-day").value);
+    }
+
     const rows = document.querySelectorAll(".goods-row");
     const goods = [];
     rows.forEach(row => {
@@ -572,9 +802,10 @@
       if (n) goods.push({ name: n, qty, unit });
     });
     if (goods.length === 0) { showToast("상품을 최소 1개 입력해주세요", "err"); return; }
+
     setLoading(true);
     try {
-      await addCustomer({ name, phone, address, startDate, cycle, goods, active: true, nextDate: null });
+      await addCustomer({ name, phone, address, startDate, ...cycleData, goods, active: true, nextDate: null });
       showToast(name + " 고객 등록 완료");
       switchTab("calendar");
     } catch (e) {
@@ -665,6 +896,9 @@
     <div class="nav-item active" data-tab="calendar" onclick="switchTab('calendar')">
       <span class="nav-icon">📅</span> 주간 캘린더
     </div>
+    <div class="nav-item" data-tab="monthly" onclick="switchTab('monthly')">
+      <span class="nav-icon">🗓️</span> 월간 캘린더
+    </div>
     <div class="nav-item" data-tab="customers" onclick="switchTab('customers')">
       <span class="nav-icon">👥</span> 고객 목록
     </div>
@@ -698,6 +932,19 @@
       <div class="week-grid" id="week-grid"></div>
     </div>
 
+    <!-- Monthly tab -->
+    <div id="tab-monthly" class="section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div class="page-title" style="margin-bottom:0;" id="monthly-title"></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn" onclick="changeMonth(-1)">◀ 이전</button>
+          <button class="btn" onclick="changeMonth(0)">오늘</button>
+          <button class="btn" onclick="changeMonth(1)">다음 ▶</button>
+        </div>
+      </div>
+      <div id="monthly-grid"></div>
+    </div>
+
     <!-- Customers tab -->
     <div id="tab-customers" class="section">
       <div class="page-title">고객 목록</div>
@@ -716,7 +963,51 @@
           <div class="form-group"><label>전화번호 *</label><input type="text" id="f-phone" placeholder="010-0000-0000"></div>
           <div class="form-group full"><label>주소 *</label><input type="text" id="f-addr" placeholder="배송 주소"></div>
           <div class="form-group"><label>시작일 *</label><input type="date" id="f-start"></div>
-          <div class="form-group"><label>발송 주기 (일) *</label><input type="number" id="f-cycle" min="1" value="7"></div>
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>발송 주기 *</label>
+          <div class="cycle-type-tabs" style="margin-top:6px;">
+            <button class="cycle-tab active" data-type="days" onclick="setCycleTab('days')">N일마다</button>
+            <button class="cycle-tab" data-type="weekly" onclick="setCycleTab('weekly')">매주 요일</button>
+            <button class="cycle-tab" data-type="monthly_weekday" onclick="setCycleTab('monthly_weekday')">매달 N번째 요일</button>
+          </div>
+          <div class="cycle-panel active" data-panel="days">
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <input type="number" id="f-cycle" min="1" value="7" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
+              <span style="font-size:13px;color:var(--text2);">일마다 발송</span>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="weekly">
+            <div class="weekday-checks">
+              <button class="weekday-btn" onclick="toggleWeekday(this,0)">일</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,1)">월</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,2)">화</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,3)">수</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,4)">목</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,5)">금</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,6)">토</button>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="monthly_weekday">
+            <div class="nth-row">
+              <select id="f-week-nth">
+                <option value="1">첫째</option>
+                <option value="2">둘째</option>
+                <option value="3">셋째</option>
+                <option value="4">넷째</option>
+                <option value="-1">마지막</option>
+              </select>
+              <select id="f-week-day">
+                <option value="0">일요일</option>
+                <option value="1">월요일</option>
+                <option value="2">화요일</option>
+                <option value="3">수요일</option>
+                <option value="4">목요일</option>
+                <option value="5">금요일</option>
+                <option value="6">토요일</option>
+              </select>
+            </div>
+          </div>
         </div>
         <div class="goods-section">
           <label>주문 상품 *</label>
