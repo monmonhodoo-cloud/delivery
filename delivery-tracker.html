@@ -811,7 +811,7 @@
     div.innerHTML = `
       <input type="text" placeholder="상품명" class="gname">
       <input type="number" placeholder="수량" class="qty" min="1" value="1">
-      <input type="text" placeholder="단위(개/kg)" class="unit">
+      <select class="unit" style="flex:0.8;padding:8px 6px;font-size:13px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;"><option value="박스">박스</option><option value="개">개</option><option value="kg">kg</option></select>
       <button class="remove-btn" onclick="document.getElementById('${id}').remove()" title="삭제">×</button>`;
     $("goods-rows").appendChild(div);
   };
