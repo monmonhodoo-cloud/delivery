@@ -1,0 +1,1502 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>정기배송 트래커</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --accent: #1D9E75;
+    --accent-light: #E1F5EE;
+    --accent-mid: #5DCAA5;
+    --accent-dark: #085041;
+    --warn-light: #FAEEDA;
+    --warn: #BA7517;
+    --danger: #A32D2D;
+    --danger-light: #FCEBEB;
+    --bg: #f8f9f7;
+    --surface: #ffffff;
+    --surface2: #f3f4f2;
+    --border: rgba(0,0,0,0.08);
+    --border-strong: rgba(0,0,0,0.15);
+    --text: #1a1a18;
+    --text2: #5a5a56;
+    --text3: #9a9a96;
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* Layout */
+  .layout { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 220px;
+    background: var(--surface);
+    border-right: 0.5px solid var(--border);
+    padding: 24px 0;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    display: flex; flex-direction: column;
+    z-index: 10;
+  }
+
+  .logo {
+    padding: 0 20px 24px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent);
+    border-bottom: 0.5px solid var(--border);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .logo-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; }
+
+  .nav-item {
+    padding: 10px 20px;
+    font-size: 13px;
+    color: var(--text2);
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    display: flex; align-items: center; gap: 10px;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-light); font-weight: 500; }
+  .nav-icon { font-size: 15px; width: 18px; text-align: center; }
+
+  .sync-status {
+    margin-top: auto;
+    padding: 12px 20px;
+    font-size: 11px;
+    color: var(--text3);
+    border-top: 0.5px solid var(--border);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); }
+  .sync-dot.ok { background: var(--accent); }
+  .sync-dot.err { background: var(--danger); }
+
+  .main {
+    margin-left: 220px;
+    flex: 1;
+    padding: 28px;
+    max-width: 1000px;
+  }
+
+  /* Sections */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* Page title */
+  .page-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+
+  /* Summary bar */
+  .summary-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .stat-label { font-size: 11px; color: var(--text3); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-val { font-size: 26px; font-weight: 700; }
+  .stat-val.accent { color: var(--accent); }
+
+  /* Week grid */
+  .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+  .day-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+    min-height: 110px;
+  }
+  .day-card.today { border-color: var(--accent); border-width: 1.5px; }
+  .day-weekday { font-size: 10px; color: var(--text3); margin-bottom: 2px; }
+  .day-date { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+  .day-card.today .day-date { color: var(--accent); }
+  .delivery-chip {
+    background: var(--accent-light);
+    border-radius: 5px;
+    padding: 5px 7px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .delivery-chip:hover { background: #9FE1CB; }
+  .chip-name { font-size: 11px; font-weight: 500; color: var(--accent-dark); }
+  .chip-goods { font-size: 10px; color: #0F6E56; margin-top: 1px; line-height: 1.4; }
+  .no-delivery { font-size: 11px; color: var(--text3); }
+
+  /* Search */
+  .search-wrap { display: flex; gap: 8px; margin-bottom: 16px; }
+  .search-input {
+    flex: 1; padding: 10px 14px; font-size: 14px;
+    border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius); background: var(--surface);
+    color: var(--text); font-family: inherit;
+    transition: border-color 0.15s;
+  }
+  .search-input:focus { outline: none; border-color: var(--accent); }
+  .filter-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .filter-tab { padding: 7px 12px; font-size: 12px; border: 0.5px solid var(--border-strong); border-radius: var(--radius); background: none; cursor: pointer; color: var(--text2); font-family: inherit; }
+  .filter-tab.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent-dark); font-weight: 500; }
+
+  /* Customer list */
+  .customer-list { display: flex; flex-direction: column; gap: 10px; }
+  .cust-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    transition: box-shadow 0.15s;
+  }
+  .cust-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .cust-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .cust-name { font-size: 15px; font-weight: 700; }
+  .cust-phone { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .badge { display: inline-block; font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 500; }
+  .badge-on { background: var(--accent-light); color: var(--accent-dark); }
+  .badge-off { background: var(--warn-light); color: #633806; }
+  .cust-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; font-size: 12px; margin-bottom: 12px; }
+  .cust-grid-label { color: var(--text3); white-space: nowrap; }
+  .cust-grid-val { color: var(--text); }
+  .next-box {
+    background: var(--accent-light);
+    border-radius: var(--radius);
+    padding: 9px 12px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; margin-bottom: 12px;
+  }
+  .next-box-label { color: #0F6E56; font-weight: 500; }
+  .next-box-date { font-weight: 700; font-size: 13px; color: var(--accent-dark); }
+  .cust-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .btn {
+    padding: 6px 13px; font-size: 12px; border-radius: var(--radius);
+    border: 0.5px solid var(--border-strong); background: none;
+    cursor: pointer; color: var(--text); font-family: inherit;
+    transition: background 0.12s;
+  }
+  .btn:hover { background: var(--surface2); }
+  .btn-danger { color: var(--danger); border-color: var(--danger); }
+  .btn-danger:hover { background: var(--danger-light); }
+  .btn-primary { background: var(--accent); color: white; border-color: var(--accent); font-weight: 500; }
+  .btn-primary:hover { background: #0F6E56; }
+
+  /* Form */
+  .form-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 24px; max-width: 600px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-group label { font-size: 12px; font-weight: 500; color: var(--text2); }
+  .form-group input, .form-group select, .form-group textarea {
+    padding: 9px 11px; font-size: 14px;
+    border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius); background: var(--surface);
+    color: var(--text); font-family: inherit;
+  }
+  .form-group textarea { min-height: 72px; resize: vertical; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--accent); }
+  .goods-section { margin-bottom: 16px; }
+  .goods-section label { font-size: 12px; font-weight: 500; color: var(--text2); display: block; margin-bottom: 8px; }
+  .goods-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .goods-row input { flex: 2; padding: 8px 10px; font-size: 13px; border: 0.5px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); font-family: inherit; }
+  .goods-row input.qty { flex: 1; }
+  .goods-row input.unit { flex: 0.8; }
+  .goods-row input:focus { outline: none; border-color: var(--accent); }
+  .remove-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: none; background: none; cursor: pointer; color: var(--text3); font-size: 18px; border-radius: 50%; }
+  .remove-btn:hover { background: var(--danger-light); color: var(--danger); }
+  .add-goods-btn {
+    width: 100%; padding: 8px; font-size: 13px;
+    border: 0.5px dashed var(--border-strong);
+    border-radius: var(--radius); background: none;
+    cursor: pointer; color: var(--text3); font-family: inherit;
+  }
+  .add-goods-btn:hover { background: var(--surface2); color: var(--text); }
+
+  /* Modal */
+  .overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.35); z-index: 50;
+    align-items: center; justify-content: center;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border-radius: var(--radius-lg);
+    border: 0.5px solid var(--border); padding: 24px;
+    width: 380px; max-width: 95vw;
+  }
+  .modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
+  .modal .form-group { margin-bottom: 14px; }
+  .modal label { font-size: 12px; font-weight: 500; color: var(--text2); display: block; margin-bottom: 5px; }
+  .modal input {
+    width: 100%; padding: 9px 11px; font-size: 14px;
+    border: 0.5px solid var(--border-strong); border-radius: var(--radius);
+    background: var(--surface); color: var(--text); font-family: inherit;
+  }
+  .modal input:focus { outline: none; border-color: var(--accent); }
+  .modal input[readonly] { background: var(--surface2); color: var(--text2); }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #2C2C2A; color: #F1EFE8;
+    padding: 11px 18px; border-radius: var(--radius);
+    font-size: 13px; z-index: 100;
+    opacity: 0; transform: translateY(8px);
+    transition: opacity 0.25s, transform 0.25s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  /* Config notice */
+  .config-notice {
+    background: #FAEEDA; border: 0.5px solid #BA7517;
+    border-radius: var(--radius); padding: 14px 16px;
+    font-size: 13px; margin-bottom: 20px; display: none;
+  }
+  .config-notice.visible { display: block; }
+  .config-notice strong { color: #633806; }
+
+  /* Loading */
+  .loading-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(255,255,255,0.7); z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  .loading-overlay.show { display: flex; }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--accent-light);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Monthly calendar */
+  .month-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .month-header-cell {
+    background: var(--surface2);
+    padding: 8px 4px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text3);
+  }
+  .month-cell {
+    background: var(--surface);
+    min-height: 90px;
+    padding: 6px;
+    vertical-align: top;
+  }
+  .month-cell.other-month { background: var(--surface2); }
+  .month-cell.today { background: #f0fdf8; }
+  .month-day-num {
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+  }
+  .month-cell.today .month-day-num {
+    background: var(--accent);
+    color: white;
+  }
+  .month-cell.sun .month-day-num { color: #A32D2D; }
+  .month-cell.sat .month-day-num { color: #185FA5; }
+  .month-chip {
+    background: var(--accent-light);
+    border-radius: 3px;
+    padding: 2px 5px;
+    font-size: 10px;
+    color: var(--accent-dark);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  .month-chip:hover { background: #9FE1CB; }
+
+  .month-more {
+    font-size: 10px;
+    color: var(--text3);
+    margin-top: 2px;
+    cursor: pointer;
+  }
+  .date-panel-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.25);
+    z-index: 45;
+  }
+  .date-panel-overlay.open { display: block; }
+  .date-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: min(380px, 92vw);
+    height: 100%;
+    background: var(--surface);
+    border-left: 0.5px solid var(--border);
+    box-shadow: -8px 0 24px rgba(0,0,0,0.12);
+    padding: 24px 20px;
+    overflow-y: auto;
+  }
+  .date-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .date-panel-title { font-size: 18px; font-weight: 700; }
+  .date-panel-sub { font-size: 12px; color: var(--text3); margin-bottom: 14px; }
+  .date-panel-list { display: flex; flex-direction: column; gap: 10px; }
+  .date-panel-item {
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    background: var(--surface);
+  }
+  .date-panel-item-name { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .date-panel-item-cycle { font-size: 12px; color: var(--text3); margin-bottom: 6px; }
+  .date-panel-item-goods { font-size: 12px; color: var(--text2); line-height: 1.5; }
+  .date-panel-empty {
+    font-size: 13px;
+    color: var(--text3);
+    border: 0.5px dashed var(--border-strong);
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+  }
+
+  .cycle-type-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .cycle-tab { flex: 1 1 110px; padding: 7px 4px; font-size: 12px; border: 0.5px solid var(--border-strong); border-radius: var(--radius); background: none; cursor: pointer; color: var(--text2); font-family: inherit; text-align: center; }
+  .cycle-tab.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent-dark); font-weight: 500; }
+  .cycle-panel { display: none; }
+  .cycle-panel.active { display: block; }
+  .weekday-checks { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .weekday-btn { width: 36px; height: 36px; border-radius: 50%; border: 0.5px solid var(--border-strong); background: none; cursor: pointer; font-size: 12px; color: var(--text2); font-family: inherit; }
+  .weekday-btn.active { background: var(--accent); border-color: var(--accent); color: white; font-weight: 500; }
+  .nth-row { display: flex; gap: 8px; margin-top: 6px; }
+  .nth-row select { flex: 1; padding: 8px 10px; font-size: 13px; border: 0.5px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); font-family: inherit; }
+  .nth-row select:focus { outline: none; border-color: var(--accent); }
+  .top-nav {
+    display: none;
+    position: fixed; top: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    z-index: 20; padding: 0 12px; height: 56px;
+    align-items: center; gap: 4px; overflow-x: auto;
+  }
+    padding: 10px 20px 14px;
+    border-bottom: 0.5px solid var(--border);
+    margin-bottom: 10px;
+  }
+  .changes-empty { font-size: 14px; color: var(--text3); padding: 2rem; text-align: center; }
+  .change-item { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 8px; }
+  .change-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .change-dot.add { background: var(--accent); }
+  .change-dot.edit { background: var(--warn); }
+  .change-dot.delete { background: var(--danger); }
+  .change-dot.pause { background: #888; }
+  .change-body { flex: 1; }
+  .change-title { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+  .change-desc { font-size: 12px; color: var(--text2); }
+  .change-time { font-size: 11px; color: var(--text3); margin-top: 3px; }
+  .badge-count { display: inline-block; background: var(--danger); color: white; font-size: 10px; font-weight: 700; border-radius: 10px; padding: 1px 6px; margin-left: 4px; vertical-align: middle; }
+  .changes-empty { font-size: 14px; color: var(--text3); padding: 2rem; text-align: center; }
+  .change-item { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 8px; }
+  .change-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .change-dot.add { background: #1D9E75; }
+  .change-dot.edit { background: #BA7517; }
+  .change-dot.delete { background: #A32D2D; }
+  .change-dot.pause { background: #888; }
+  .change-body { flex: 1; }
+  .change-title { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+  .change-desc { font-size: 12px; color: var(--text2); }
+  .change-time { font-size: 11px; color: var(--text3); margin-top: 3px; }
+  .badge-count { display: inline-block; background: #A32D2D; color: white; font-size: 10px; font-weight: 700; border-radius: 10px; padding: 1px 6px; margin-left: 4px; vertical-align: middle; }
+  .top-nav-logo { font-size: 13px; font-weight: 700; color: var(--accent); margin-right: 8px; white-space: nowrap; flex-shrink: 0; }
+  .top-nav-item { padding: 6px 12px; font-size: 12px; border-radius: var(--radius); border: none; background: none; cursor: pointer; color: var(--text2); white-space: nowrap; flex-shrink: 0; font-family: inherit; }
+  .top-nav-item.active { background: var(--accent-light); color: var(--accent-dark); font-weight: 500; }
+  .top-nav-item:hover { background: var(--surface2); }
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .top-nav { display: flex; }
+    .main { margin-left: 0; padding: 16px; padding-top: 72px; }
+    .week-grid { grid-template-columns: repeat(4, 1fr); }
+    .form-grid { grid-template-columns: 1fr; }
+    .summary-bar { grid-template-columns: 1fr 1fr; }
+    .month-cell { min-height: 60px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ====================================================
+     🔧 FIREBASE 설정 — 아래 값을 실제 Firebase 프로젝트 설정값으로 교체하세요
+     Firebase Console → 프로젝트 설정 → 내 앱 → SDK 설정 및 구성
+     ==================================================== -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import {
+    getFirestore, collection, doc,
+    addDoc, updateDoc, deleteDoc,
+    onSnapshot, query, orderBy
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyBn2DaV51NU3pHOulOWCl--bcifSTWErac",
+    authDomain:        "delivery-4aef4.firebaseapp.com",
+    projectId:         "delivery-4aef4",
+    storageBucket:     "delivery-4aef4.firebasestorage.app",
+    messagingSenderId: "284197926346",
+    appId:             "1:284197926346:web:ad79742c0a9ee582c3cb33",
+    measurementId:     "G-6Y28VX0Q9R"
+  };
+
+  const IS_DEMO = firebaseConfig.apiKey === "YOUR_API_KEY";
+
+  // ── App init ──────────────────────────────────────────────────────────────
+  let app, db, unsubscribe;
+  let customers = [];
+  let editingId = null;
+
+  if (!IS_DEMO) {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const dateStr = d => d.toISOString().slice(0, 10);
+  const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+  const parseDate = s => new Date(s + "T00:00:00");
+  const DAYS = ["일","월","화","수","목","금","토"];
+
+  function showToast(msg, type = "normal") {
+    const t = $("toast");
+    t.textContent = msg;
+    t.style.background = type === "err" ? "#A32D2D" : "#2C2C2A";
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2800);
+  }
+
+  function setSyncStatus(state) {
+    const dot = $("sync-dot");
+    const label = $("sync-label");
+    dot.className = "sync-dot " + (state === "ok" ? "ok" : state === "err" ? "err" : "");
+    label.textContent = state === "ok" ? "실시간 연결됨" : state === "err" ? "연결 오류" : "연결 중...";
+  }
+
+  function setLoading(show) {
+    $("loading").classList.toggle("show", show);
+  }
+
+  // ── Delivery logic ────────────────────────────────────────────────────────
+  // cycleType: "days" | "weekly" | "monthly_day" | "n_weekly" | "monthly_weekday" | "odd_month_day" | "even_month_day" | "odd_month_weekday" | "even_month_weekday" | "irregular"
+  // days: N일마다
+  // weekly: 매주 특정 요일(들) — weekdays: [0,1,...] (0=일)
+  // monthly_day: 매달 N일 — monthDay: 1~31
+  // n_weekly: N주마다 특정 요일 — weekInterval: 1~, weekDay: 0~6
+  // monthly_weekday: 매달 N번째 요일 — weekNth: 1~5(-1=마지막), weekDay: 0~6
+  // irregular: 비정기 — nextDate로 지정한 날짜에만 표시
+
+  function getNthWeekdayOfMonth(year, month, nth, weekday) {
+    // nth: 1~4, weekday: 0=일~6=토
+    // nth=-1이면 마지막
+    if (nth === -1) {
+      const last = new Date(year, month + 1, 0);
+      const diff = (weekday - last.getDay() + 7) % 7;
+      return new Date(year, month, last.getDate() - diff);
+    }
+    const first = new Date(year, month, 1);
+    const diff = (weekday - first.getDay() + 7) % 7;
+    const date = 1 + diff + (nth - 1) * 7;
+    if (date > new Date(year, month + 1, 0).getDate()) return null;
+    return new Date(year, month, date);
+  }
+
+  function isDeliveryDay(c, ds) {
+    if (!c.active) return false;
+    const start = parseDate(c.startDate);
+    const target = parseDate(ds);
+    if (target < start) return false;
+
+    // 수동 변경일 우선 처리
+    if (c.nextDate) {
+      if (c.nextDate === ds) return true;
+      const nd = parseDate(c.nextDate);
+      if ((c.cycleType || "days") === "irregular") return false;
+      if (target <= nd) return false;
+      // nextDate 이후로는 원래 주기로 복귀
+      return checkCycle(c, ds, nd);
+    }
+    return checkCycle(c, ds, start);
+  }
+
+  function checkCycle(c, ds, baseDate) {
+    const target = new Date(ds + "T00:00:00");
+    const type = c.cycleType || "days";
+
+    if (type === "days") {
+      const diff = Math.round((target - baseDate) / 86400000);
+      return diff >= 0 && diff % (c.cycle || 7) === 0;
+    }
+    if (type === "irregular") return false;
+    if (type === "weekly") {
+      const days = c.weekdays || [];
+      return days.includes(target.getDay()) && target >= baseDate;
+    }
+    if (type === "monthly_day") {
+      if (target < baseDate) return false;
+      const monthDay = Math.min(c.monthDay || 1, new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate());
+      return target.getDate() === monthDay;
+    }
+    if (type === "odd_month_day" || type === "even_month_day") {
+      if (target < baseDate) return false;
+      const monthNumber = target.getMonth() + 1;
+      const wantsOdd = type === "odd_month_day";
+      if ((monthNumber % 2 === 1) !== wantsOdd) return false;
+      const monthDay = Math.min(c.monthDay || 1, new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate());
+      return target.getDate() === monthDay;
+    }
+    if (type === "n_weekly") {
+      if (target.getDay() !== c.weekDay) return false;
+      const weekInterval = c.weekInterval || 1;
+      const diffDays = Math.round((target - baseDate) / 86400000);
+      return diffDays >= 0 && Math.floor(diffDays / 7) % weekInterval === 0;
+    }
+    if (type === "monthly_weekday") {
+      if (target < baseDate) return false;
+      const d = getNthWeekdayOfMonth(target.getFullYear(), target.getMonth(), c.weekNth, c.weekDay);
+      return d && dateStr(d) === ds;
+    }
+    if (type === "odd_month_weekday" || type === "even_month_weekday") {
+      if (target < baseDate) return false;
+      const monthNumber = target.getMonth() + 1;
+      const wantsOdd = type === "odd_month_weekday";
+      if ((monthNumber % 2 === 1) !== wantsOdd) return false;
+      const d = getNthWeekdayOfMonth(target.getFullYear(), target.getMonth(), c.weekNth, c.weekDay);
+      return d && dateStr(d) === ds;
+    }
+    return false;
+  }
+
+  // 구버전 호환
+  function getDeliveriesForDate(c, ds) { return isDeliveryDay(c, ds); }
+
+  function getNextDelivery(c) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    for (let i = 0; i <= 400; i++) {
+      const ds = dateStr(addDays(today, i));
+      if (isDeliveryDay(c, ds)) return ds;
+    }
+    return null;
+  }
+
+  function cycleLabel(c) {
+    const type = c.cycleType || "days";
+    const dayNames = ["일","월","화","수","목","금","토"];
+    if (type === "days") return `${c.cycle}일마다`;
+    if (type === "weekly") {
+      const days = (c.weekdays || []).map(d => dayNames[d] + "요일").join(", ");
+      return `매주 ${days}`;
+    }
+    if (type === "monthly_day") return `매달 ${c.monthDay}일마다`;
+    if (type === "odd_month_day") return `홀수달 ${c.monthDay}일마다`;
+    if (type === "even_month_day") return `짝수달 ${c.monthDay}일마다`;
+    if (type === "n_weekly") return `${c.weekInterval || 1}주마다 ${dayNames[c.weekDay]}요일`;
+    if (type === "irregular") return "비정기";
+    if (type === "monthly_weekday") {
+      const nth = c.weekNth === -1 ? "마지막" : c.weekNth + "번째";
+      return `매달 ${nth} ${dayNames[c.weekDay]}요일`;
+    }
+    if (type === "odd_month_weekday") {
+      const nth = c.weekNth === -1 ? "마지막" : c.weekNth + "번째";
+      return `홀수달 ${nth} ${dayNames[c.weekDay]}요일`;
+    }
+    if (type === "even_month_weekday") {
+      const nth = c.weekNth === -1 ? "마지막" : c.weekNth + "번째";
+      return `짝수달 ${nth} ${dayNames[c.weekDay]}요일`;
+    }
+    return "-";
+  }
+
+  // ── Firestore realtime ────────────────────────────────────────────────────
+  function startRealtimeSync() {
+    if (!db) return;
+    setSyncStatus("connecting");
+    const q = query(collection(db, "customers"), orderBy("createdAt", "asc"));
+    unsubscribe = onSnapshot(q,
+      snapshot => {
+        customers = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        setSyncStatus("ok");
+        renderCalendar();
+        renderCustomers();
+      },
+      err => {
+        console.error(err);
+        setSyncStatus("err");
+        showToast("Firebase 연결 오류: " + err.message, "err");
+      }
+    );
+  }
+
+  // Demo mode: use localStorage
+  function loadDemo() {
+    try { customers = JSON.parse(localStorage.getItem("dt_demo") || "[]"); } catch { customers = []; }
+    renderCalendar(); renderCustomers();
+  }
+  function saveDemo() {
+    localStorage.setItem("dt_demo", JSON.stringify(customers));
+  }
+
+  // ── CRUD ──────────────────────────────────────────────────────────────────
+  async function addCustomer(data) {
+    data.createdAt = Date.now();
+    if (db) {
+      await addDoc(collection(db, "customers"), data);
+    } else {
+      data.id = Date.now().toString(36);
+      customers.push(data);
+      saveDemo();
+      renderCalendar(); renderCustomers();
+    }
+    logChange("add", data.name, "신규 고객 등록");
+  }
+
+  async function updateCustomer(id, data) {
+    if (db) {
+      await updateDoc(doc(db, "customers", id), data);
+    } else {
+      const i = customers.findIndex(c => c.id === id);
+      if (i >= 0) { customers[i] = { ...customers[i], ...data }; saveDemo(); }
+      renderCalendar(); renderCustomers();
+    }
+  }
+
+  async function deleteCustomer(id) {
+    if (db) {
+      await deleteDoc(doc(db, "customers", id));
+    } else {
+      customers = customers.filter(c => c.id !== id);
+      saveDemo();
+      renderCalendar(); renderCustomers();
+    }
+  }
+
+  // ── Tab navigation ────────────────────────────────────────────────────────
+  window.switchTab = function(name) {
+    document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+    document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+    document.querySelectorAll(".top-nav-item").forEach(n => n.classList.remove("active"));
+    $("tab-" + name).classList.add("active");
+    document.querySelectorAll(`[data-tab="${name}"]`).forEach(el => el.classList.add("active"));
+    if (name === "calendar") renderCalendar();
+    if (name === "monthly") renderMonthly();
+    if (name === "customers") renderCustomers();
+    if (name === "changes") renderChanges();
+    if (name === "add" && !editingCustomerId) initForm();
+    updateChangeBadge();
+  };
+
+  // ── Monthly calendar ──────────────────────────────────────────────────────
+  let monthOffset = 0;
+
+  window.changeMonth = function(dir) {
+    if (dir === 0) monthOffset = 0;
+    else monthOffset += dir;
+    renderMonthly();
+  };
+
+  function renderMonthly() {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const base = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+    const year = base.getFullYear();
+    const month = base.getMonth();
+
+    $("monthly-title").textContent = `${year}년 ${month + 1}월`;
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const lastDate = new Date(year, month + 1, 0).getDate();
+
+    let html = `<div class="month-grid">`;
+    const dayNames = ["일","월","화","수","목","금","토"];
+    dayNames.forEach(d => { html += `<div class="month-header-cell">${d}</div>`; });
+
+    // 이전달 빈칸
+    for (let i = 0; i < firstDay; i++) {
+      const prevDate = new Date(year, month, -firstDay + i + 1);
+      html += `<div class="month-cell other-month">
+        <div class="month-day-num" style="color:var(--text3)">${prevDate.getDate()}</div>
+      </div>`;
+    }
+
+    for (let d = 1; d <= lastDate; d++) {
+      const cellDate = new Date(year, month, d);
+      const ds = dateStr(cellDate);
+      const isToday = ds === dateStr(today);
+      const dow = cellDate.getDay();
+      const deliveries = customers.filter(c => getDeliveriesForDate(c, ds));
+      const dowClass = dow === 0 ? "sun" : dow === 6 ? "sat" : "";
+      const todayClass = isToday ? "today" : "";
+
+      html += `<div class="month-cell ${dowClass} ${todayClass}">
+        <div class="month-day-num">${d}</div>`;
+
+      const max = 2;
+      deliveries.slice(0, max).forEach(c => {
+        html += `<div class="month-chip" onclick="openEdit('${c.id}')" title="${c.name} | ${c.goods.map(g=>g.name+' '+g.qty+g.unit).join(', ')}">${c.name}</div>`;
+      });
+      if (deliveries.length > max) {
+        html += `<div class="month-more" onclick="event.stopPropagation();openDatePanel('${ds}')">+${deliveries.length - max}명 더</div>`;
+      }
+
+      html += `</div>`;
+    }
+
+    // 다음달 빈칸
+    const totalCells = firstDay + lastDate;
+    const remainder = totalCells % 7;
+    if (remainder > 0) {
+      for (let i = 1; i <= 7 - remainder; i++) {
+        html += `<div class="month-cell other-month">
+          <div class="month-day-num" style="color:var(--text3)">${i}</div>
+        </div>`;
+      }
+    }
+
+    html += `</div>`;
+    $("monthly-grid").innerHTML = html;
+  }
+
+  // ── Calendar ──────────────────────────────────────────────────────────────
+  window.openDatePanel = function(ds) {
+    const targetDate = new Date(ds + "T00:00:00");
+    const deliveries = customers.filter(c => getDeliveriesForDate(c, ds));
+    const title = `${targetDate.getFullYear()}년 ${targetDate.getMonth() + 1}월 ${targetDate.getDate()}일`;
+    $("date-panel-title").textContent = title;
+    $("date-panel-sub").textContent = `${deliveries.length}명의 배송이 있어요`;
+    const list = $("date-panel-list");
+    if (!deliveries.length) {
+      list.innerHTML = `<div class="date-panel-empty">이 날짜에는 예정된 배송이 없어요.</div>`;
+    } else {
+      list.innerHTML = deliveries.map(c => {
+        const goods = (c.goods || []).map(g => `${g.name} ${g.qty}${g.unit}`).join(", ");
+        return `<div class="date-panel-item">
+          <div class="date-panel-item-name">${c.name}</div>
+          <div class="date-panel-item-cycle">${cycleLabel(c)}</div>
+          <div class="date-panel-item-goods">${goods || "상품 정보 없음"}</div>
+        </div>`;
+      }).join("");
+    }
+    $("date-panel-overlay").classList.add("open");
+  };
+
+  window.closeDatePanel = function() {
+    $("date-panel-overlay").classList.remove("open");
+  };
+  function renderCalendar() {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const grid = $("week-grid");
+    grid.innerHTML = "";
+    let todayCnt = 0, weekCnt = 0;
+
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(today, i);
+      const ds = dateStr(d);
+      const isToday = i === 0;
+      const del = customers.filter(c => getDeliveriesForDate(c, ds));
+      if (isToday) todayCnt = del.length;
+      weekCnt += del.length;
+
+      const card = document.createElement("div");
+      card.className = "day-card" + (isToday ? " today" : "");
+      let html = `<div class="day-weekday">${DAYS[d.getDay()]}요일</div>
+                  <div class="day-date">${d.getMonth()+1}/${d.getDate()}</div>`;
+      if (del.length === 0) {
+        html += `<div class="no-delivery">배송 없음</div>`;
+      } else {
+        del.forEach(c => {
+          const goods = c.goods.map(g => `${g.name} ${g.qty}${g.unit}`).join(", ");
+          html += `<div class="delivery-chip" onclick="openEdit('${c.id}')">
+            <div class="chip-name">${c.name}</div>
+            <div class="chip-goods">${goods}</div>
+          </div>`;
+        });
+      }
+      card.innerHTML = html;
+      grid.appendChild(card);
+    }
+
+    $("stat-today").textContent = todayCnt + "건";
+    $("stat-week").textContent = weekCnt + "건";
+    $("stat-active").textContent = customers.filter(c => c.active).length + "명";
+  }
+
+  // ── Customer list ─────────────────────────────────────────────────────────
+  let customerFilter = "all";
+
+  function renderCustomers() {
+    const q = ($("search-input").value || "").trim().toLowerCase();
+    const list = $("customer-list");
+    let filtered = customers.filter(c => {
+      const matchesSearch = !q || c.name.toLowerCase().includes(q) || c.phone.includes(q);
+      const type = c.cycleType || "days";
+      const matchesFilter =
+        customerFilter === "all" ||
+        (customerFilter === "active" && c.active && type !== "irregular") ||
+        (customerFilter === "irregular" && type === "irregular") ||
+        (customerFilter === "paused" && !c.active);
+      return matchesSearch && matchesFilter;
+    });
+
+    if (filtered.length === 0) {
+      list.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--text3);font-size:14px;">${q || customerFilter !== "all" ? "검색 결과 없음" : "등록된 고객이 없어요"}</div>`;
+      return;
+    }
+
+    list.innerHTML = filtered.map(c => {
+      const next = getNextDelivery(c);
+      const goods = c.goods.map(g => `${g.name} ${g.qty}${g.unit}`).join(" / ");
+      return `<div class="cust-card">
+        <div class="cust-header">
+          <div>
+            <div class="cust-name">${c.name}</div>
+            <div class="cust-phone">${c.phone}</div>
+          </div>
+          <span class="badge ${c.active ? "badge-on" : "badge-off"}">${c.active ? "배송중" : "일시정지"}</span>
+        </div>
+        <div class="cust-grid">
+          <span class="cust-grid-label">주소</span><span class="cust-grid-val">${c.address}</span>
+          ${c.memo ? `<span class="cust-grid-label">메모</span><span class="cust-grid-val">${c.memo}</span>` : ""}
+          <span class="cust-grid-label">상품</span><span class="cust-grid-val">${goods}</span>
+          <span class="cust-grid-label">발송 주기</span><span class="cust-grid-val">${cycleLabel(c)}</span>
+          <span class="cust-grid-label">시작일</span><span class="cust-grid-val">${c.startDate}</span>
+        </div>
+        ${next ? `<div class="next-box"><span class="next-box-label">다음 배송일</span><span class="next-box-date">${next}</span></div>` : ""}
+        <div class="cust-actions">
+          <button class="btn" onclick="openCustomerEdit('${c.id}')">수정</button>
+          <button class="btn" onclick="openEdit('${c.id}')">배송일 변경</button>
+          <button class="btn" onclick="toggleActive('${c.id}')">${c.active ? "일시정지" : "배송 재개"}</button>
+          <button class="btn btn-danger" onclick="confirmDelete('${c.id}', '${c.name}')">삭제</button>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  window.setCustomerFilter = function(filter) {
+    customerFilter = filter;
+    document.querySelectorAll(".filter-tab").forEach(btn => btn.classList.toggle("active", btn.dataset.filter === filter));
+    renderCustomers();
+  };
+
+  // ── Form ──────────────────────────────────────────────────────────────────
+  let goodsCnt = 0;
+  let selectedWeekdays = [];
+  let editingCustomerId = null;
+
+  function initForm() {
+    editingCustomerId = null;
+    $("add-title").textContent = "신규 고객 등록";
+    $("submit-customer-btn").textContent = "등록하기";
+    $("cancel-edit-btn").style.display = "none";
+    $("f-name").value = "";
+    $("f-phone").value = "";
+    $("f-addr").value = "";
+    $("f-memo").value = "";
+    $("f-start").value = dateStr(new Date());
+    $("f-cycle").value = 7;
+    $("f-month-day").value = 1;
+    $("f-week-interval").value = 2;
+    $("f-n-week-day").value = 0;
+    $("f-week-nth").value = 1;
+    $("f-week-day").value = 0;
+    $("goods-rows").innerHTML = "";
+    goodsCnt = 0;
+    selectedWeekdays = [];
+    document.querySelectorAll(".weekday-btn").forEach(b => b.classList.remove("active"));
+    setCycleTab("days");
+    addGoodsRow();
+  }
+
+  function addGoodsRowWithData(g = {}) {
+    window.addGoodsRow();
+    const row = $("goods-rows").lastElementChild;
+    row.querySelector(".gname").value = g.name || "";
+    row.querySelector(".qty").value = g.qty || "1";
+    row.querySelector(".unit").value = g.unit || "박스";
+  }
+
+  function setSelectedWeekdays(days = []) {
+    selectedWeekdays = [...days];
+    document.querySelectorAll(".weekday-btn").forEach(btn => {
+      const match = btn.getAttribute("onclick").match(/toggleWeekday\(this,(\d)\)/);
+      const day = match ? parseInt(match[1]) : -1;
+      btn.classList.toggle("active", selectedWeekdays.includes(day));
+    });
+  }
+
+  function fillFormForEdit(c) {
+    editingCustomerId = c.id;
+    $("add-title").textContent = "고객 정보 수정";
+    $("submit-customer-btn").textContent = "수정 저장";
+    $("cancel-edit-btn").style.display = "block";
+    $("f-name").value = c.name || "";
+    $("f-phone").value = c.phone || "";
+    $("f-addr").value = c.address || "";
+    $("f-memo").value = c.memo || "";
+    $("f-start").value = c.startDate || dateStr(new Date());
+    $("f-cycle").value = c.cycle || 7;
+    $("f-month-day").value = c.monthDay || 1;
+    $("f-odd-month-day").value = c.monthDay || 1;
+    $("f-even-month-day").value = c.monthDay || 1;
+    $("f-week-interval").value = c.weekInterval || 2;
+    $("f-n-week-day").value = c.weekDay ?? 0;
+    $("f-week-nth").value = c.weekNth || 1;
+    $("f-week-day").value = c.weekDay ?? 0;
+    $("goods-rows").innerHTML = "";
+    goodsCnt = 0;
+    const goods = c.goods && c.goods.length ? c.goods : [{}];
+    goods.forEach(addGoodsRowWithData);
+    setCycleTab(c.cycleType || "days");
+    setSelectedWeekdays(c.weekdays || []);
+  }
+
+  window.setCycleTab = function(type) {
+    if ($("f-cycle-type")) $("f-cycle-type").value = type;
+    document.querySelectorAll(".cycle-panel").forEach(p => p.classList.toggle("active", p.dataset.panel === type));
+  };
+
+  window.toggleWeekday = function(btn, day) {
+    const idx = selectedWeekdays.indexOf(day);
+    if (idx >= 0) { selectedWeekdays.splice(idx, 1); btn.classList.remove("active"); }
+    else { selectedWeekdays.push(day); btn.classList.add("active"); }
+  };
+
+  window.addGoodsRow = function() {
+    goodsCnt++;
+    const id = "gr" + goodsCnt;
+    const div = document.createElement("div");
+    div.className = "goods-row"; div.id = id;
+    div.innerHTML = `
+      <input type="text" placeholder="상품명" class="gname">
+      <input type="number" placeholder="수량" class="qty" min="1" value="1">
+      <select class="unit" style="flex:0.8;padding:8px 6px;font-size:13px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;"><option value="박스">박스</option><option value="개">개</option><option value="kg">kg</option></select>
+      <button class="remove-btn" onclick="document.getElementById('${id}').remove()" title="삭제">×</button>`;
+    $("goods-rows").appendChild(div);
+  };
+
+  window.openCustomerEdit = function(id) {
+    const c = customers.find(x => x.id === id);
+    if (!c) return;
+    fillFormForEdit(c);
+    switchTab("add");
+  };
+
+  window.cancelCustomerEdit = function() {
+    initForm();
+  };
+
+  window.submitCustomer = async function() {
+    const name = $("f-name").value.trim();
+    const phone = $("f-phone").value.trim();
+    const address = $("f-addr").value.trim();
+    const memo = $("f-memo").value.trim();
+    const startDate = $("f-start").value;
+    if (!name || !phone || !address || !startDate) { showToast("필수 항목을 모두 입력해주세요", "err"); return; }
+
+    // 주기 타입 파악
+    const cycleType = $("f-cycle-type") ? $("f-cycle-type").value : "days";
+    let cycleData = { cycleType };
+
+    if (cycleType === "days") {
+      const cycle = parseInt($("f-cycle").value) || 7;
+      cycleData.cycle = cycle;
+    } else if (cycleType === "weekly") {
+      if (selectedWeekdays.length === 0) { showToast("요일을 최소 1개 선택해주세요", "err"); return; }
+      cycleData.weekdays = [...selectedWeekdays];
+    } else if (cycleType === "monthly_day") {
+      const monthDay = parseInt($("f-month-day").value) || 1;
+      if (monthDay < 1 || monthDay > 31) { showToast("일자는 1~31 사이로 입력해주세요", "err"); return; }
+      cycleData.monthDay = monthDay;
+    } else if (cycleType === "n_weekly") {
+      const weekInterval = parseInt($("f-week-interval").value) || 1;
+      if (weekInterval < 1) { showToast("주기는 1주 이상으로 입력해주세요", "err"); return; }
+      cycleData.weekInterval = weekInterval;
+      cycleData.weekDay = parseInt($("f-n-week-day").value);
+    } else if (cycleType === "monthly_weekday") {
+      cycleData.weekNth = parseInt($("f-week-nth").value);
+      cycleData.weekDay = parseInt($("f-week-day").value);
+    } else if (cycleType === "irregular") {
+      cycleData.nextDate = null;
+    }
+
+    const rows = document.querySelectorAll(".goods-row");
+    const goods = [];
+    rows.forEach(row => {
+      const n = row.querySelector(".gname").value.trim();
+      const qty = row.querySelector(".qty").value || "1";
+      const unit = row.querySelector(".unit").value.trim() || "개";
+      if (n) goods.push({ name: n, qty, unit });
+    });
+    if (goods.length === 0) { showToast("상품을 최소 1개 입력해주세요", "err"); return; }
+
+    setLoading(true);
+    try {
+      if (editingCustomerId) {
+        const c = customers.find(x => x.id === editingCustomerId);
+        const updateData = { name, phone, address, memo, startDate, ...cycleData, goods };
+        if (cycleType !== "irregular" && c && c.cycleType === "irregular") updateData.nextDate = null;
+        await updateCustomer(editingCustomerId, updateData);
+        if (c) logChange("edit", name, "고객 정보 수정");
+        showToast(name + " 고객 정보 수정 완료");
+        editingCustomerId = null;
+        switchTab("customers");
+      } else {
+        await addCustomer({ name, phone, address, memo, startDate, ...cycleData, goods, active: true, nextDate: null });
+        showToast(name + " 고객 등록 완료");
+        switchTab("calendar");
+      }
+    } catch (e) {
+      showToast("저장 오류: " + e.message, "err");
+    } finally { setLoading(false); }
+  };
+
+  // ── Edit modal ────────────────────────────────────────────────────────────
+  window.openEdit = function(id) {
+    editingId = id;
+    const c = customers.find(x => x.id === id);
+    if (!c) return;
+    $("modal-name").value = c.name;
+    const isIrregular = (c.cycleType || "days") === "irregular";
+    $("modal-date-label").textContent = isIrregular ? "표시할 배송일" : "다음 배송일";
+    $("modal-cycle-group").style.display = isIrregular ? "none" : "block";
+    $("modal-date").value = c.nextDate || getNextDelivery(c) || dateStr(new Date());
+    $("modal-cycle").value = c.cycle;
+    $("edit-overlay").classList.add("open");
+  };
+
+  window.closeModal = function() {
+    $("edit-overlay").classList.remove("open");
+    editingId = null;
+  };
+
+  window.saveEdit = async function() {
+    const nextDate = $("modal-date").value;
+    const cycle = parseInt($("modal-cycle").value) || 7;
+    const c = customers.find(x => x.id === editingId);
+    const isIrregular = c && (c.cycleType || "days") === "irregular";
+    setLoading(true);
+    try {
+      await updateCustomer(editingId, isIrregular ? { nextDate } : { nextDate, cycle });
+      if (c) logChange("edit", c.name, (isIrregular ? "비정기 배송일 지정 → " : "배송일 변경 → ") + nextDate);
+      closeModal();
+      showToast("저장됐어요");
+    } catch (e) {
+      showToast("저장 오류: " + e.message, "err");
+    } finally { setLoading(false); }
+  };
+
+  // ── Toggle / Delete ───────────────────────────────────────────────────────
+  window.toggleActive = async function(id) {
+    const c = customers.find(x => x.id === id);
+    if (!c) return;
+    setLoading(true);
+    try {
+      const newActive = !c.active;
+      await updateCustomer(id, { active: newActive });
+      logChange("pause", c.name, newActive ? "배송 재개" : "배송 일시정지");
+      showToast(c.active ? "배송 일시정지" : "배송 재개");
+    } catch (e) {
+      showToast("오류: " + e.message, "err");
+    } finally { setLoading(false); }
+  };
+
+  window.confirmDelete = function(id, name) {
+    if (!confirm(`"${name}" 고객을 삭제하시겠어요?`)) return;
+    doDelete(id);
+  };
+
+  async function doDelete(id) {
+    const c = customers.find(x => x.id === id);
+    const name = c ? c.name : "고객";
+    setLoading(true);
+    try {
+      await deleteCustomer(id);
+      logChange("delete", name, "고객 삭제");
+      showToast("삭제됐어요");
+    } catch (e) {
+      showToast("삭제 오류: " + e.message, "err");
+    } finally { setLoading(false); }
+  }
+
+  // ── Search ────────────────────────────────────────────────────────────────
+  window.onSearchInput = function() { renderCustomers(); };
+
+  // ── DateTime clock ───────────────────────────────────────────────────────
+
+  function todayKey() { return new Date().toISOString().slice(0,10); }
+
+  let selectedChangeDate = todayKey();
+
+  function loadChanges(date = selectedChangeDate) {
+    try {
+      const raw = localStorage.getItem(CHANGES_KEY);
+      if (!raw) return [];
+      const all = JSON.parse(raw);
+      return all.filter(c => c.date === date);
+    } catch { return []; }
+  }
+
+  function logChange(type, name, desc) {
+    try {
+      const raw = localStorage.getItem(CHANGES_KEY);
+      const all = raw ? JSON.parse(raw) : [];
+      const now = new Date();
+      all.push({
+        date: todayKey(),
+        type, name, desc,
+        time: now.toTimeString().slice(0,8)
+      });
+      localStorage.setItem(CHANGES_KEY, JSON.stringify(all.slice(-1000)));
+      updateChangeBadge();
+      if ($("changes-list")) renderChanges();
+    } catch {}
+  }
+
+  function updateChangeBadge() {
+    const changes = loadChanges(todayKey());
+    const navItems = document.querySelectorAll('[data-tab="changes"]');
+    navItems.forEach(el => {
+      const existing = el.querySelector(".badge-count");
+      if (existing) existing.remove();
+      if (changes.length > 0) {
+        const badge = document.createElement("span");
+        badge.className = "badge-count";
+        badge.textContent = changes.length;
+        el.appendChild(badge);
+      }
+    });
+  }
+
+  function renderChanges() {
+    const input = $("changes-picker");
+    if (input) {
+      if (!input.value) input.value = selectedChangeDate;
+      selectedChangeDate = input.value || todayKey();
+    }
+    const changes = loadChanges(selectedChangeDate);
+    const list = $("changes-list");
+    const dateEl = $("changes-date");
+    if (dateEl) dateEl.textContent = selectedChangeDate + " 변경 내역";
+    if (!list) return;
+    if (changes.length === 0) {
+      list.innerHTML = `<div class="changes-empty">선택한 날짜의 변경사항이 없어요</div>`;
+      return;
+    }
+    const typeMap = { add: { label: "등록", cls: "add" }, edit: { label: "수정", cls: "edit" }, delete: { label: "삭제", cls: "delete" }, pause: { label: "상태", cls: "pause" } };
+    list.innerHTML = [...changes].reverse().map(c => {
+      const t = typeMap[c.type] || { label: c.type, cls: "edit" };
+      return `<div class="change-item">
+        <div class="change-dot ${t.cls}"></div>
+        <div class="change-body">
+          <div class="change-title">${c.name}</div>
+          <div class="change-desc">${c.desc}</div>
+          <div class="change-time">${c.time}</div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+  window.renderChanges = renderChanges;
+
+  window.clearChanges = function() {
+    if (!confirm(selectedChangeDate + " 변경 기록을 지울까요?")) return;
+    try {
+      const raw = localStorage.getItem(CHANGES_KEY);
+      const all = raw ? JSON.parse(raw) : [];
+      localStorage.setItem(CHANGES_KEY, JSON.stringify(all.filter(c => c.date !== selectedChangeDate)));
+    } catch {}
+    renderChanges();
+    updateChangeBadge();
+  };
+  // ── Init ──────────────────────────────────────────────────────────────────
+  document.addEventListener("DOMContentLoaded", () => {
+    if (IS_DEMO) {
+      $("config-notice").classList.add("visible");
+      setSyncStatus("err");
+      loadDemo();
+    } else {
+      startRealtimeSync();
+    }
+    initForm();
+    renderCalendar();
+    updateChangeBadge();
+  });
+</script>
+
+<!-- ── HTML ──────────────────────────────────────────────────────────────── -->
+
+<!-- Top nav (모바일/좁은 화면) -->
+<nav class="top-nav" id="top-nav">
+  <span class="top-nav-logo">배송 트래커</span>
+  <button class="top-nav-item active" data-tab="calendar" onclick="switchTab('calendar')">📅 주간</button>
+  <button class="top-nav-item" data-tab="monthly" onclick="switchTab('monthly')">🗓️ 월간</button>
+  <button class="top-nav-item" data-tab="customers" onclick="switchTab('customers')">👥 고객</button>
+  <button class="top-nav-item" data-tab="changes" onclick="switchTab('changes')">🔔 변경</button>
+  <button class="top-nav-item" data-tab="add" onclick="switchTab('add')">➕ 등록</button>
+</nav>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="logo"><div class="logo-dot"></div>배송 트래커</div>
+    <div class="nav-item active" data-tab="calendar" onclick="switchTab('calendar')">
+      <span class="nav-icon">📅</span> 주간 캘린더
+    </div>
+    <div class="nav-item" data-tab="monthly" onclick="switchTab('monthly')">
+      <span class="nav-icon">🗓️</span> 월간 캘린더
+    </div>
+    <div class="nav-item" data-tab="customers" onclick="switchTab('customers')">
+      <span class="nav-icon">👥</span> 고객 목록
+    </div>
+    <div class="nav-item" data-tab="changes" onclick="switchTab('changes')">
+      <span class="nav-icon">🔔</span> 변경사항
+    </div>
+    <div class="nav-item" data-tab="add" onclick="switchTab('add')">
+      <span class="nav-icon">➕</span> 신규 등록
+    </div>
+    <div class="sync-status">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span id="sync-label">연결 중...</span>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- Config notice (demo mode) -->
+    <div class="config-notice" id="config-notice">
+      <strong>⚠ Firebase 미설정 상태입니다.</strong>
+      HTML 파일 상단의 <code>firebaseConfig</code> 값을 교체하면 실시간 연동이 활성화됩니다.
+      현재는 이 브라우저 로컬에만 저장됩니다.
+    </div>
+
+    <!-- Calendar tab -->
+    <div id="tab-calendar" class="section active">
+      <div class="page-title">주간 배송 현황</div>
+      <div class="summary-bar">
+        <div class="stat-card"><div class="stat-label">오늘 배송</div><div class="stat-val accent" id="stat-today">0건</div></div>
+        <div class="stat-card"><div class="stat-label">이번 주 총 배송</div><div class="stat-val" id="stat-week">0건</div></div>
+        <div class="stat-card"><div class="stat-label">활성 고객</div><div class="stat-val" id="stat-active">0명</div></div>
+      </div>
+      <div class="week-grid" id="week-grid"></div>
+    </div>
+
+    <!-- Monthly tab -->
+    <div id="tab-monthly" class="section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div class="page-title" style="margin-bottom:0;" id="monthly-title"></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn" onclick="changeMonth(-1)">◀ 이전</button>
+          <button class="btn" onclick="changeMonth(0)">오늘</button>
+          <button class="btn" onclick="changeMonth(1)">다음 ▶</button>
+        </div>
+      </div>
+      <div id="monthly-grid"></div>
+    </div>
+
+    <!-- Changes tab -->
+    <div id="tab-changes" class="section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div class="page-title" style="margin-bottom:0;">변경사항</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="date" id="changes-picker" onchange="renderChanges()" style="padding:7px 10px;font-size:13px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;">
+          <button class="btn" onclick="clearChanges()">기록 지우기</button>
+        </div>
+      </div>
+      <div id="changes-date" style="font-size:13px;color:var(--text3);margin-bottom:16px;"></div>
+      <div id="changes-list"></div>
+    </div>
+
+    <!-- Customers tab -->
+    <div id="tab-customers" class="section">
+      <div class="page-title">고객 목록</div>
+      <div class="search-wrap">
+        <input type="text" class="search-input" id="search-input" placeholder="고객명 또는 전화번호 검색" oninput="onSearchInput()">
+      </div>
+      <div class="filter-tabs">
+        <button class="filter-tab active" data-filter="all" onclick="setCustomerFilter('all')">전체</button>
+        <button class="filter-tab" data-filter="active" onclick="setCustomerFilter('active')">정기 고객</button>
+        <button class="filter-tab" data-filter="irregular" onclick="setCustomerFilter('irregular')">비정기 고객</button>
+        <button class="filter-tab" data-filter="paused" onclick="setCustomerFilter('paused')">보류</button>
+      </div>
+      <div class="customer-list" id="customer-list"></div>
+    </div>
+
+    <!-- Add tab -->
+    <div id="tab-add" class="section">
+      <div class="page-title" id="add-title">신규 고객 등록</div>
+      <div class="form-card">
+        <div class="form-grid">
+          <div class="form-group"><label>고객명 *</label><input type="text" id="f-name" placeholder="홍길동"></div>
+          <div class="form-group"><label>전화번호 *</label><input type="text" id="f-phone" placeholder="010-0000-0000"></div>
+          <div class="form-group full"><label>주소 *</label><input type="text" id="f-addr" placeholder="배송 주소"></div>
+          <div class="form-group full"><label>메모</label><textarea id="f-memo" placeholder="배송 요청사항 또는 참고 메모"></textarea></div>
+          <div class="form-group"><label>시작일 *</label><input type="date" id="f-start"></div>
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>발송 주기 *</label>
+          <select id="f-cycle-type" onchange="setCycleTab(this.value)" style="margin-top:6px;">
+            <option value="days">N일마다</option>
+            <option value="weekly">매주 요일</option>
+            <option value="monthly_day">매달 N일마다</option>
+            <option value="n_weekly">N주 N요일마다</option>
+            <option value="monthly_weekday">매달 N번째 요일</option>
+            <option value="odd_month_day">홀수달 N일</option>
+            <option value="even_month_day">짝수달 N일</option>
+            <option value="odd_month_weekday">홀수달 N째주 N요일</option>
+            <option value="even_month_weekday">짝수달 N째주 N요일</option>
+            <option value="irregular">비정기</option>
+          </select>
+          <div class="cycle-panel active" data-panel="days"> 
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <input type="number" id="f-cycle" min="1" value="7" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
+              <span style="font-size:13px;color:var(--text2);">일마다 발송</span>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="weekly">
+            <div class="weekday-checks">
+              <button class="weekday-btn" onclick="toggleWeekday(this,0)">일</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,1)">월</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,2)">화</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,3)">수</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,4)">목</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,5)">금</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,6)">토</button>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="irregular">
+            <div style="font-size:13px;color:var(--text2);margin-top:4px;">
+              자동 반복 없이 고객 목록에 보관하고, 배송일 변경에서 다음 배송일을 지정한 날짜에만 캘린더에 표시합니다.
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="monthly_day">
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <span style="font-size:13px;color:var(--text2);">매달</span>
+              <input type="number" id="f-month-day" min="1" max="31" value="1" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
+              <span style="font-size:13px;color:var(--text2);">일마다 발송</span>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="n_weekly">
+            <div class="nth-row">
+              <input type="number" id="f-week-interval" min="1" value="2" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
+              <span style="font-size:13px;color:var(--text2);">주마다</span>
+              <select id="f-n-week-day">
+                <option value="0">일요일</option>
+                <option value="1">월요일</option>
+                <option value="2">화요일</option>
+                <option value="3">수요일</option>
+                <option value="4">목요일</option>
+                <option value="5">금요일</option>
+                <option value="6">토요일</option>
+              </select>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="monthly_weekday">
+            <div class="nth-row">
+              <select id="f-week-nth">
+                <option value="1">첫째</option>
+                <option value="2">둘째</option>
+                <option value="3">셋째</option>
+                <option value="4">넷째</option>
+                <option value="-1">마지막</option>
+              </select>
+              <select id="f-week-day">
+                <option value="0">일요일</option>
+                <option value="1">월요일</option>
+                <option value="2">화요일</option>
+                <option value="3">수요일</option>
+                <option value="4">목요일</option>
+                <option value="5">금요일</option>
+                <option value="6">토요일</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="goods-section">
+          <label>주문 상품 *</label>
+          <div id="goods-rows"></div>
+          <button class="add-goods-btn" onclick="addGoodsRow()">+ 상품 추가</button>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn" id="cancel-edit-btn" onclick="cancelCustomerEdit()" style="display:none;flex:1;padding:11px;">취소</button>
+          <button class="btn btn-primary" id="submit-customer-btn" onclick="submitCustomer()" style="flex:2;padding:11px;">등록하기</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="date-panel-overlay" id="date-panel-overlay" onclick="if(event.target===this) closeDatePanel()">
+  <aside class="date-panel">
+    <div class="date-panel-header">
+      <div class="date-panel-title" id="date-panel-title">날짜별 배송</div>
+      <button class="btn" onclick="closeDatePanel()">닫기</button>
+    </div>
+    <div class="date-panel-sub" id="date-panel-sub"></div>
+    <div class="date-panel-list" id="date-panel-list"></div>
+  </aside>
+</div>
+
+<!-- Edit modal -->
+<div class="overlay" id="edit-overlay">
+  <div class="modal">
+    <h3>배송 일정 변경</h3>
+    <div class="form-group"><label>고객명</label><input type="text" id="modal-name" readonly></div>
+    <div class="form-group"><label id="modal-date-label">다음 배송일</label><input type="date" id="modal-date"></div>
+    <div class="form-group" id="modal-cycle-group"><label>발송 주기 (일)</label><input type="number" id="modal-cycle" min="1"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveEdit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast & Loading -->
+<div class="toast" id="toast"></div>
+<div class="loading-overlay" id="loading"><div class="spinner"></div></div>
+
+</body>
+</html>
+
+
+
+
+
+
