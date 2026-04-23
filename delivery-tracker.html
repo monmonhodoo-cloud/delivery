@@ -1420,13 +1420,13 @@
     const changes = loadChanges(selectedChangeDate);
     const list = $("changes-list");
     const dateEl = $("changes-date");
-    if (dateEl) dateEl.textContent = selectedChangeDate + " 蹂寃??댁뿭";
+    if (dateEl) dateEl.textContent = selectedChangeDate + " 변경 내역";
     if (!list) return;
     if (changes.length === 0) {
-      list.innerHTML = `<div class="changes-empty">?좏깮???좎쭨??蹂寃쎌궗??씠 ?놁뼱??/div>`;
+      list.innerHTML = `<div class="changes-empty">선택한 날짜의 변경사항이 없어요</div>`;
       return;
     }
-    const typeMap = { add: { label: "?깅줉", cls: "add" }, edit: { label: "?섏젙", cls: "edit" }, delete: { label: "??젣", cls: "delete" }, pause: { label: "?곹깭", cls: "pause" } };
+    const typeMap = { add: { label: "등록", cls: "add" }, edit: { label: "수정", cls: "edit" }, delete: { label: "삭제", cls: "delete" }, pause: { label: "상태", cls: "pause" } };
     list.innerHTML = [...changes].reverse().map(c => {
       const t = typeMap[c.type] || { label: c.type, cls: "edit" };
       return `<div class="change-item">
@@ -1476,8 +1476,8 @@
 
 <!-- Top nav (紐⑤컮??醫곸? ?붾㈃) -->
 <nav class="top-nav" id="top-nav">
-  <span class="top-nav-logo">諛곗넚 ?몃옒而?/span>
-  <button class="top-nav-item active" data-tab="calendar" onclick="switchTab('calendar')">?뱟 二쇨컙</button>
+  <span class="top-nav-logo">배송 트래커</span>
+  <button class="top-nav-item active" data-tab="calendar" onclick="switchTab('calendar')">📅 주간</button>
   <button class="top-nav-item" data-tab="monthly" onclick="switchTab('monthly')">🗓️ 월간</button>
   <button class="top-nav-item" data-tab="customers" onclick="switchTab('customers')">👥 고객</button>
   <button class="top-nav-item" data-tab="changes" onclick="switchTab('changes')">🔔 변경</button>
@@ -1804,6 +1804,7 @@
 
 </body>
 </html>
+
 
 
 
