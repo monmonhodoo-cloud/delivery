@@ -195,13 +195,14 @@
   .form-group { display: flex; flex-direction: column; gap: 6px; }
   .form-group.full { grid-column: 1 / -1; }
   .form-group label { font-size: 12px; font-weight: 500; color: var(--text2); }
-  .form-group input, .form-group select {
+  .form-group input, .form-group select, .form-group textarea {
     padding: 9px 11px; font-size: 14px;
     border: 0.5px solid var(--border-strong);
     border-radius: var(--radius); background: var(--surface);
     color: var(--text); font-family: inherit;
   }
-  .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
+  .form-group textarea { min-height: 72px; resize: vertical; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--accent); }
   .goods-section { margin-bottom: 16px; }
   .goods-section label { font-size: 12px; font-weight: 500; color: var(--text2); display: block; margin-bottom: 8px; }
   .goods-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
@@ -775,6 +776,7 @@
         </div>
         <div class="cust-grid">
           <span class="cust-grid-label">주소</span><span class="cust-grid-val">${c.address}</span>
+          ${c.memo ? `<span class="cust-grid-label">메모</span><span class="cust-grid-val">${c.memo}</span>` : ""}
           <span class="cust-grid-label">상품</span><span class="cust-grid-val">${goods}</span>
           <span class="cust-grid-label">발송 주기</span><span class="cust-grid-val">${cycleLabel(c)}</span>
           <span class="cust-grid-label">시작일</span><span class="cust-grid-val">${c.startDate}</span>
@@ -797,6 +799,7 @@
     $("f-name").value = "";
     $("f-phone").value = "";
     $("f-addr").value = "";
+    $("f-memo").value = "";
     $("f-start").value = dateStr(new Date());
     $("f-cycle").value = 7;
     $("goods-rows").innerHTML = "";
@@ -834,6 +837,7 @@
     const name = $("f-name").value.trim();
     const phone = $("f-phone").value.trim();
     const address = $("f-addr").value.trim();
+    const memo = $("f-memo").value.trim();
     const startDate = $("f-start").value;
     if (!name || !phone || !address || !startDate) { showToast("필수 항목을 모두 입력해주세요", "err"); return; }
 
@@ -874,7 +878,7 @@
 
     setLoading(true);
     try {
-      await addCustomer({ name, phone, address, startDate, ...cycleData, goods, active: true, nextDate: null });
+      await addCustomer({ name, phone, address, memo, startDate, ...cycleData, goods, active: true, nextDate: null });
       showToast(name + " 고객 등록 완료");
       switchTab("calendar");
     } catch (e) {
@@ -1148,6 +1152,7 @@
           <div class="form-group"><label>고객명 *</label><input type="text" id="f-name" placeholder="홍길동"></div>
           <div class="form-group"><label>전화번호 *</label><input type="text" id="f-phone" placeholder="010-0000-0000"></div>
           <div class="form-group full"><label>주소 *</label><input type="text" id="f-addr" placeholder="배송 주소"></div>
+          <div class="form-group full"><label>메모</label><textarea id="f-memo" placeholder="배송 요청사항 또는 참고 메모"></textarea></div>
           <div class="form-group"><label>시작일 *</label><input type="date" id="f-start"></div>
         </div>
         <div class="form-group" style="margin-bottom:14px;">
