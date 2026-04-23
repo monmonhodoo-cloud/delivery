@@ -637,7 +637,7 @@
     if (name === "monthly") renderMonthly();
     if (name === "customers") renderCustomers();
     if (name === "changes") renderChanges();
-    if (name === "add") initForm();
+    if (name === "add" && !editingCustomerId) initForm();
     updateChangeBadge();
   };
 
@@ -783,6 +783,7 @@
         </div>
         ${next ? `<div class="next-box"><span class="next-box-label">다음 배송일</span><span class="next-box-date">${next}</span></div>` : ""}
         <div class="cust-actions">
+          <button class="btn" onclick="openCustomerEdit('${c.id}')">수정</button>
           <button class="btn" onclick="openEdit('${c.id}')">배송일 변경</button>
           <button class="btn" onclick="toggleActive('${c.id}')">${c.active ? "일시정지" : "배송 재개"}</button>
           <button class="btn btn-danger" onclick="confirmDelete('${c.id}', '${c.name}')">삭제</button>
@@ -794,19 +795,71 @@
   // ── Form ──────────────────────────────────────────────────────────────────
   let goodsCnt = 0;
   let selectedWeekdays = [];
+  let editingCustomerId = null;
 
   function initForm() {
+    editingCustomerId = null;
+    $("add-title").textContent = "신규 고객 등록";
+    $("submit-customer-btn").textContent = "등록하기";
+    $("cancel-edit-btn").style.display = "none";
     $("f-name").value = "";
     $("f-phone").value = "";
     $("f-addr").value = "";
     $("f-memo").value = "";
     $("f-start").value = dateStr(new Date());
     $("f-cycle").value = 7;
+    $("f-month-day").value = 1;
+    $("f-week-interval").value = 2;
+    $("f-n-week-day").value = 0;
+    $("f-week-nth").value = 1;
+    $("f-week-day").value = 0;
     $("goods-rows").innerHTML = "";
     goodsCnt = 0;
     selectedWeekdays = [];
+    document.querySelectorAll(".weekday-btn").forEach(b => b.classList.remove("active"));
     setCycleTab("days");
     addGoodsRow();
+  }
+
+  function addGoodsRowWithData(g = {}) {
+    window.addGoodsRow();
+    const row = $("goods-rows").lastElementChild;
+    row.querySelector(".gname").value = g.name || "";
+    row.querySelector(".qty").value = g.qty || "1";
+    row.querySelector(".unit").value = g.unit || "박스";
+  }
+
+  function setSelectedWeekdays(days = []) {
+    selectedWeekdays = [...days];
+    document.querySelectorAll(".weekday-btn").forEach(btn => {
+      const match = btn.getAttribute("onclick").match(/toggleWeekday\(this,(\d)\)/);
+      const day = match ? parseInt(match[1]) : -1;
+      btn.classList.toggle("active", selectedWeekdays.includes(day));
+    });
+  }
+
+  function fillFormForEdit(c) {
+    editingCustomerId = c.id;
+    $("add-title").textContent = "고객 정보 수정";
+    $("submit-customer-btn").textContent = "수정 저장";
+    $("cancel-edit-btn").style.display = "block";
+    $("f-name").value = c.name || "";
+    $("f-phone").value = c.phone || "";
+    $("f-addr").value = c.address || "";
+    $("f-memo").value = c.memo || "";
+    $("f-start").value = c.startDate || dateStr(new Date());
+    $("f-cycle").value = c.cycle || 7;
+    $("f-month-day").value = c.monthDay || 1;
+    $("f-week-interval").value = c.weekInterval || 2;
+    $("f-n-week-day").value = c.weekDay ?? 0;
+    $("f-week-nth").value = c.weekNth || 1;
+    $("f-week-day").value = c.weekDay ?? 0;
+    $("goods-rows").innerHTML = "";
+    goodsCnt = 0;
+    const goods = c.goods && c.goods.length ? c.goods : [{}];
+    goods.forEach(addGoodsRowWithData);
+    setCycleTab(c.cycleType || "days");
+    setSelectedWeekdays(c.weekdays || []);
   }
 
   window.setCycleTab = function(type) {
@@ -831,6 +884,17 @@
       <select class="unit" style="flex:0.8;padding:8px 6px;font-size:13px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;"><option value="박스">박스</option><option value="개">개</option><option value="kg">kg</option></select>
       <button class="remove-btn" onclick="document.getElementById('${id}').remove()" title="삭제">×</button>`;
     $("goods-rows").appendChild(div);
+  };
+
+  window.openCustomerEdit = function(id) {
+    const c = customers.find(x => x.id === id);
+    if (!c) return;
+    fillFormForEdit(c);
+    switchTab("add");
+  };
+
+  window.cancelCustomerEdit = function() {
+    initForm();
   };
 
   window.submitCustomer = async function() {
@@ -878,9 +942,18 @@
 
     setLoading(true);
     try {
-      await addCustomer({ name, phone, address, memo, startDate, ...cycleData, goods, active: true, nextDate: null });
-      showToast(name + " 고객 등록 완료");
-      switchTab("calendar");
+      if (editingCustomerId) {
+        const c = customers.find(x => x.id === editingCustomerId);
+        await updateCustomer(editingCustomerId, { name, phone, address, memo, startDate, ...cycleData, goods });
+        if (c) logChange("edit", name, "고객 정보 수정");
+        showToast(name + " 고객 정보 수정 완료");
+        editingCustomerId = null;
+        switchTab("customers");
+      } else {
+        await addCustomer({ name, phone, address, memo, startDate, ...cycleData, goods, active: true, nextDate: null });
+        showToast(name + " 고객 등록 완료");
+        switchTab("calendar");
+      }
     } catch (e) {
       showToast("저장 오류: " + e.message, "err");
     } finally { setLoading(false); }
@@ -1146,7 +1219,7 @@
 
     <!-- Add tab -->
     <div id="tab-add" class="section">
-      <div class="page-title">신규 고객 등록</div>
+      <div class="page-title" id="add-title">신규 고객 등록</div>
       <div class="form-card">
         <div class="form-grid">
           <div class="form-group"><label>고객명 *</label><input type="text" id="f-name" placeholder="홍길동"></div>
@@ -1229,7 +1302,10 @@
           <div id="goods-rows"></div>
           <button class="add-goods-btn" onclick="addGoodsRow()">+ 상품 추가</button>
         </div>
-        <button class="btn btn-primary" onclick="submitCustomer()" style="width:100%;padding:11px;">등록하기</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn" id="cancel-edit-btn" onclick="cancelCustomerEdit()" style="display:none;flex:1;padding:11px;">취소</button>
+          <button class="btn btn-primary" id="submit-customer-btn" onclick="submitCustomer()" style="flex:2;padding:11px;">등록하기</button>
+        </div>
       </div>
     </div>
 
