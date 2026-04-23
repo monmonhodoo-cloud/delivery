@@ -451,8 +451,8 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import {
     getFirestore, collection, doc,
-    addDoc, updateDoc, deleteDoc, setDoc,
-    onSnapshot, query, orderBy
+    addDoc, updateDoc, deleteDoc, setDoc, getDocs,
+    onSnapshot, query, orderBy, where
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -468,9 +468,10 @@
   const IS_DEMO = firebaseConfig.apiKey === "YOUR_API_KEY";
 
   // ?? App init ??????????????????????????????????????????????????????????????
-  let app, db, unsubscribe, notesUnsubscribe;
+  let app, db, unsubscribe, notesUnsubscribe, changesUnsubscribe;
   let customers = [];
   let deliveryNotes = [];
+  let changeLogs = [];
   let editingId = null;
   let editingNoteKey = null;
 
@@ -691,7 +692,7 @@
       err => {
         console.error(err);
         setSyncStatus("err");
-        showToast("Firebase ?곌껐 ?ㅻ쪟: " + err.message, "err");
+        showToast("Firebase 연결 오류: " + err.message, "err");
       }
     );
     const noteQuery = query(collection(db, "deliveryNotes"), orderBy("createdAt", "asc"));
@@ -703,19 +704,33 @@
       },
       err => console.error(err)
     );
+    const changesQuery = query(collection(db, "changeLogs"), orderBy("createdAt", "asc"));
+    changesUnsubscribe = onSnapshot(changesQuery,
+      snapshot => {
+        changeLogs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        updateChangeBadge();
+        if ($("changes-list")) renderChanges();
+      },
+      err => console.error(err)
+    );
   }
 
   // Demo mode: use localStorage
   function loadDemo() {
     try { customers = JSON.parse(localStorage.getItem("dt_demo") || "[]"); } catch { customers = []; }
     try { deliveryNotes = JSON.parse(localStorage.getItem("dt_notes") || "[]"); } catch { deliveryNotes = []; }
+    try { changeLogs = JSON.parse(localStorage.getItem(CHANGES_KEY) || "[]"); } catch { changeLogs = []; }
     renderCalendar(); renderCustomers();
+    updateChangeBadge();
   }
   function saveDemo() {
     localStorage.setItem("dt_demo", JSON.stringify(customers));
   }
   function saveDemoNotes() {
     localStorage.setItem("dt_notes", JSON.stringify(deliveryNotes));
+  }
+  function saveDemoChanges() {
+    localStorage.setItem(CHANGES_KEY, JSON.stringify(changeLogs.slice(-1000)));
   }
 
   // ?? CRUD ??????????????????????????????????????????????????????????????????
@@ -1370,28 +1385,31 @@
   let selectedChangeDate = todayKey();
 
   function loadChanges(date = selectedChangeDate) {
-    try {
-      const raw = localStorage.getItem(CHANGES_KEY);
-      if (!raw) return [];
-      const all = JSON.parse(raw);
-      return all.filter(c => c.date === date);
-    } catch { return []; }
+    return changeLogs.filter(c => c.date === date);
   }
 
   function logChange(type, name, desc) {
-    try {
-      const raw = localStorage.getItem(CHANGES_KEY);
-      const all = raw ? JSON.parse(raw) : [];
-      const now = new Date();
-      all.push({
-        date: todayKey(),
-        type, name, desc,
-        time: now.toTimeString().slice(0,8)
+    const now = new Date();
+    const entry = {
+      date: todayKey(),
+      type,
+      name,
+      desc,
+      time: now.toTimeString().slice(0,8),
+      createdAt: now.getTime()
+    };
+    if (db) {
+      addDoc(collection(db, "changeLogs"), entry).catch(err => {
+        console.error(err);
+        showToast("변경사항 저장 오류: " + err.message, "err");
       });
-      localStorage.setItem(CHANGES_KEY, JSON.stringify(all.slice(-1000)));
-      updateChangeBadge();
-      if ($("changes-list")) renderChanges();
-    } catch {}
+      return;
+    }
+    changeLogs.push(entry);
+    changeLogs = changeLogs.slice(-1000);
+    saveDemoChanges();
+    updateChangeBadge();
+    if ($("changes-list")) renderChanges();
   }
 
   function updateChangeBadge() {
@@ -1439,13 +1457,19 @@
   }
   window.renderChanges = renderChanges;
 
-  window.clearChanges = function() {
-    if (!confirm(selectedChangeDate + " 蹂寃?湲곕줉??吏?멸퉴??")) return;
+  window.clearChanges = async function() {
+    if (!confirm(selectedChangeDate + " 변경 기록을 지울까요?")) return;
     try {
-      const raw = localStorage.getItem(CHANGES_KEY);
-      const all = raw ? JSON.parse(raw) : [];
-      localStorage.setItem(CHANGES_KEY, JSON.stringify(all.filter(c => c.date !== selectedChangeDate)));
-    } catch {}
+      if (db) {
+        const snapshot = await getDocs(query(collection(db, "changeLogs"), where("date", "==", selectedChangeDate)));
+        await Promise.all(snapshot.docs.map(d => deleteDoc(doc(db, "changeLogs", d.id))));
+      } else {
+        changeLogs = changeLogs.filter(c => c.date !== selectedChangeDate);
+        saveDemoChanges();
+      }
+    } catch (e) {
+      showToast("기록 삭제 오류: " + e.message, "err");
+    }
     renderChanges();
     updateChangeBadge();
   };
@@ -1796,5 +1820,8 @@
 
 </body>
 </html>
+
+
+
 
 
