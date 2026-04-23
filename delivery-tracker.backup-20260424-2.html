@@ -337,58 +337,11 @@
     cursor: pointer;
   }
   .month-chip:hover { background: #9FE1CB; }
-
   .month-more {
     font-size: 10px;
     color: var(--text3);
     margin-top: 2px;
     cursor: pointer;
-  }
-  .date-panel-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.25);
-    z-index: 45;
-  }
-  .date-panel-overlay.open { display: block; }
-  .date-panel {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: min(380px, 92vw);
-    height: 100%;
-    background: var(--surface);
-    border-left: 0.5px solid var(--border);
-    box-shadow: -8px 0 24px rgba(0,0,0,0.12);
-    padding: 24px 20px;
-    overflow-y: auto;
-  }
-  .date-panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 14px;
-  }
-  .date-panel-title { font-size: 18px; font-weight: 700; }
-  .date-panel-sub { font-size: 12px; color: var(--text3); margin-bottom: 14px; }
-  .date-panel-list { display: flex; flex-direction: column; gap: 10px; }
-  .date-panel-item {
-    border: 0.5px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px;
-    background: var(--surface);
-  }
-  .date-panel-item-name { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
-  .date-panel-item-cycle { font-size: 12px; color: var(--text3); margin-bottom: 6px; }
-  .date-panel-item-goods { font-size: 12px; color: var(--text2); line-height: 1.5; }
-  .date-panel-empty {
-    font-size: 13px;
-    color: var(--text3);
-    border: 0.5px dashed var(--border-strong);
-    border-radius: var(--radius);
-    padding: 16px;
-    text-align: center;
   }
 
   .cycle-type-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -516,7 +469,7 @@
   }
 
   // ── Delivery logic ────────────────────────────────────────────────────────
-  // cycleType: "days" | "weekly" | "monthly_day" | "n_weekly" | "monthly_weekday" | "odd_month_day" | "even_month_day" | "odd_month_weekday" | "even_month_weekday" | "irregular"
+  // cycleType: "days" | "weekly" | "monthly_day" | "n_weekly" | "monthly_weekday" | "irregular"
   // days: N일마다
   // weekly: 매주 특정 요일(들) — weekdays: [0,1,...] (0=일)
   // monthly_day: 매달 N일 — monthDay: 1~31
@@ -558,7 +511,7 @@
   }
 
   function checkCycle(c, ds, baseDate) {
-    const target = new Date(ds + "T00:00:00");
+    const target = parseDate(ds);
     const type = c.cycleType || "days";
 
     if (type === "days") {
@@ -568,18 +521,9 @@
     if (type === "irregular") return false;
     if (type === "weekly") {
       const days = c.weekdays || [];
-      return days.includes(target.getDay()) && target >= baseDate;
+      return days.includes(target.getDay());
     }
     if (type === "monthly_day") {
-      if (target < baseDate) return false;
-      const monthDay = Math.min(c.monthDay || 1, new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate());
-      return target.getDate() === monthDay;
-    }
-    if (type === "odd_month_day" || type === "even_month_day") {
-      if (target < baseDate) return false;
-      const monthNumber = target.getMonth() + 1;
-      const wantsOdd = type === "odd_month_day";
-      if ((monthNumber % 2 === 1) !== wantsOdd) return false;
       const monthDay = Math.min(c.monthDay || 1, new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate());
       return target.getDate() === monthDay;
     }
@@ -590,15 +534,6 @@
       return diffDays >= 0 && Math.floor(diffDays / 7) % weekInterval === 0;
     }
     if (type === "monthly_weekday") {
-      if (target < baseDate) return false;
-      const d = getNthWeekdayOfMonth(target.getFullYear(), target.getMonth(), c.weekNth, c.weekDay);
-      return d && dateStr(d) === ds;
-    }
-    if (type === "odd_month_weekday" || type === "even_month_weekday") {
-      if (target < baseDate) return false;
-      const monthNumber = target.getMonth() + 1;
-      const wantsOdd = type === "odd_month_weekday";
-      if ((monthNumber % 2 === 1) !== wantsOdd) return false;
       const d = getNthWeekdayOfMonth(target.getFullYear(), target.getMonth(), c.weekNth, c.weekDay);
       return d && dateStr(d) === ds;
     }
@@ -626,21 +561,11 @@
       return `매주 ${days}`;
     }
     if (type === "monthly_day") return `매달 ${c.monthDay}일마다`;
-    if (type === "odd_month_day") return `홀수달 ${c.monthDay}일마다`;
-    if (type === "even_month_day") return `짝수달 ${c.monthDay}일마다`;
     if (type === "n_weekly") return `${c.weekInterval || 1}주마다 ${dayNames[c.weekDay]}요일`;
     if (type === "irregular") return "비정기";
     if (type === "monthly_weekday") {
       const nth = c.weekNth === -1 ? "마지막" : c.weekNth + "번째";
       return `매달 ${nth} ${dayNames[c.weekDay]}요일`;
-    }
-    if (type === "odd_month_weekday") {
-      const nth = c.weekNth === -1 ? "마지막" : c.weekNth + "번째";
-      return `홀수달 ${nth} ${dayNames[c.weekDay]}요일`;
-    }
-    if (type === "even_month_weekday") {
-      const nth = c.weekNth === -1 ? "마지막" : c.weekNth + "번째";
-      return `짝수달 ${nth} ${dayNames[c.weekDay]}요일`;
     }
     return "-";
   }
@@ -772,7 +697,7 @@
         html += `<div class="month-chip" onclick="openEdit('${c.id}')" title="${c.name} | ${c.goods.map(g=>g.name+' '+g.qty+g.unit).join(', ')}">${c.name}</div>`;
       });
       if (deliveries.length > max) {
-        html += `<div class="month-more" onclick="event.stopPropagation();openDatePanel('${ds}')">+${deliveries.length - max}명 더</div>`;
+        html += `<div class="month-more">+${deliveries.length - max}명 더</div>`;
       }
 
       html += `</div>`;
@@ -794,31 +719,6 @@
   }
 
   // ── Calendar ──────────────────────────────────────────────────────────────
-  window.openDatePanel = function(ds) {
-    const targetDate = new Date(ds + "T00:00:00");
-    const deliveries = customers.filter(c => getDeliveriesForDate(c, ds));
-    const title = `${targetDate.getFullYear()}년 ${targetDate.getMonth() + 1}월 ${targetDate.getDate()}일`;
-    $("date-panel-title").textContent = title;
-    $("date-panel-sub").textContent = `${deliveries.length}명의 배송이 있어요`;
-    const list = $("date-panel-list");
-    if (!deliveries.length) {
-      list.innerHTML = `<div class="date-panel-empty">이 날짜에는 예정된 배송이 없어요.</div>`;
-    } else {
-      list.innerHTML = deliveries.map(c => {
-        const goods = (c.goods || []).map(g => `${g.name} ${g.qty}${g.unit}`).join(", ");
-        return `<div class="date-panel-item">
-          <div class="date-panel-item-name">${c.name}</div>
-          <div class="date-panel-item-cycle">${cycleLabel(c)}</div>
-          <div class="date-panel-item-goods">${goods || "상품 정보 없음"}</div>
-        </div>`;
-      }).join("");
-    }
-    $("date-panel-overlay").classList.add("open");
-  };
-
-  window.closeDatePanel = function() {
-    $("date-panel-overlay").classList.remove("open");
-  };
   function renderCalendar() {
     const today = new Date(); today.setHours(0,0,0,0);
     const grid = $("week-grid");
@@ -972,8 +872,6 @@
     $("f-start").value = c.startDate || dateStr(new Date());
     $("f-cycle").value = c.cycle || 7;
     $("f-month-day").value = c.monthDay || 1;
-    $("f-odd-month-day").value = c.monthDay || 1;
-    $("f-even-month-day").value = c.monthDay || 1;
     $("f-week-interval").value = c.weekInterval || 2;
     $("f-n-week-day").value = c.weekDay ?? 0;
     $("f-week-nth").value = c.weekNth || 1;
@@ -1377,10 +1275,6 @@
             <option value="monthly_day">매달 N일마다</option>
             <option value="n_weekly">N주 N요일마다</option>
             <option value="monthly_weekday">매달 N번째 요일</option>
-            <option value="odd_month_day">홀수달 N일</option>
-            <option value="even_month_day">짝수달 N일</option>
-            <option value="odd_month_weekday">홀수달 N째주 N요일</option>
-            <option value="even_month_weekday">짝수달 N째주 N요일</option>
             <option value="irregular">비정기</option>
           </select>
           <div class="cycle-panel active" data-panel="days"> 
@@ -1463,17 +1357,6 @@
   </main>
 </div>
 
-<div class="date-panel-overlay" id="date-panel-overlay" onclick="if(event.target===this) closeDatePanel()">
-  <aside class="date-panel">
-    <div class="date-panel-header">
-      <div class="date-panel-title" id="date-panel-title">날짜별 배송</div>
-      <button class="btn" onclick="closeDatePanel()">닫기</button>
-    </div>
-    <div class="date-panel-sub" id="date-panel-sub"></div>
-    <div class="date-panel-list" id="date-panel-list"></div>
-  </aside>
-</div>
-
 <!-- Edit modal -->
 <div class="overlay" id="edit-overlay">
   <div class="modal">
@@ -1494,9 +1377,5 @@
 
 </body>
 </html>
-
-
-
-
 
 
