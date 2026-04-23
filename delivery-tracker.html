@@ -1107,9 +1107,10 @@
     const c = customers.find(x => x.id === id);
     if (!c) return;
     $("modal-name").value = c.name;
-    const isIrregular = (c.cycleType || "days") === "irregular";
+    const type = c.cycleType || "days";
+    const isIrregular = type === "irregular";
     $("modal-date-label").textContent = isIrregular ? "표시할 배송일" : "다음 배송일";
-    $("modal-cycle-group").style.display = isIrregular ? "none" : "block";
+    $("modal-cycle-group").style.display = type === "days" ? "block" : "none";
     $("modal-date").value = c.nextDate || getNextDelivery(c) || dateStr(new Date());
     $("modal-cycle").value = c.cycle;
     $("edit-overlay").classList.add("open");
@@ -1124,10 +1125,12 @@
     const nextDate = $("modal-date").value;
     const cycle = parseInt($("modal-cycle").value) || 7;
     const c = customers.find(x => x.id === editingId);
-    const isIrregular = c && (c.cycleType || "days") === "irregular";
+    const type = c ? (c.cycleType || "days") : "days";
+    const isIrregular = type === "irregular";
     setLoading(true);
     try {
-      await updateCustomer(editingId, isIrregular ? { nextDate } : { nextDate, cycle });
+      const updateData = type === "days" ? { nextDate, cycle } : { nextDate };
+      await updateCustomer(editingId, updateData);
       if (c) logChange("edit", c.name, (isIrregular ? "비정기 배송일 지정 → " : "배송일 변경 → ") + nextDate);
       closeModal();
       showToast("저장됐어요");
