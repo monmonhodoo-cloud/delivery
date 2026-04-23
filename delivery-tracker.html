@@ -147,6 +147,9 @@
     transition: border-color 0.15s;
   }
   .search-input:focus { outline: none; border-color: var(--accent); }
+  .filter-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .filter-tab { padding: 7px 12px; font-size: 12px; border: 0.5px solid var(--border-strong); border-radius: var(--radius); background: none; cursor: pointer; color: var(--text2); font-family: inherit; }
+  .filter-tab.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent-dark); font-weight: 500; }
 
   /* Customer list */
   .customer-list { display: flex; flex-direction: column; gap: 10px; }
@@ -466,12 +469,13 @@
   }
 
   // ── Delivery logic ────────────────────────────────────────────────────────
-  // cycleType: "days" | "weekly" | "monthly_day" | "n_weekly" | "monthly_weekday"
+  // cycleType: "days" | "weekly" | "monthly_day" | "n_weekly" | "monthly_weekday" | "irregular"
   // days: N일마다
   // weekly: 매주 특정 요일(들) — weekdays: [0,1,...] (0=일)
   // monthly_day: 매달 N일 — monthDay: 1~31
   // n_weekly: N주마다 특정 요일 — weekInterval: 1~, weekDay: 0~6
   // monthly_weekday: 매달 N번째 요일 — weekNth: 1~5(-1=마지막), weekDay: 0~6
+  // irregular: 비정기 — nextDate로 지정한 날짜에만 표시
 
   function getNthWeekdayOfMonth(year, month, nth, weekday) {
     // nth: 1~4, weekday: 0=일~6=토
@@ -498,6 +502,7 @@
     if (c.nextDate) {
       if (c.nextDate === ds) return true;
       const nd = parseDate(c.nextDate);
+      if ((c.cycleType || "days") === "irregular") return false;
       if (target <= nd) return false;
       // nextDate 이후로는 원래 주기로 복귀
       return checkCycle(c, ds, nd);
@@ -513,6 +518,7 @@
       const diff = Math.round((target - baseDate) / 86400000);
       return diff >= 0 && diff % (c.cycle || 7) === 0;
     }
+    if (type === "irregular") return false;
     if (type === "weekly") {
       const days = c.weekdays || [];
       return days.includes(target.getDay());
@@ -556,6 +562,7 @@
     }
     if (type === "monthly_day") return `매달 ${c.monthDay}일마다`;
     if (type === "n_weekly") return `${c.weekInterval || 1}주마다 ${dayNames[c.weekDay]}요일`;
+    if (type === "irregular") return "비정기";
     if (type === "monthly_weekday") {
       const nth = c.weekNth === -1 ? "마지막" : c.weekNth + "번째";
       return `매달 ${nth} ${dayNames[c.weekDay]}요일`;
@@ -751,15 +758,24 @@
   }
 
   // ── Customer list ─────────────────────────────────────────────────────────
+  let customerFilter = "all";
+
   function renderCustomers() {
     const q = ($("search-input").value || "").trim().toLowerCase();
     const list = $("customer-list");
-    let filtered = q
-      ? customers.filter(c => c.name.toLowerCase().includes(q) || c.phone.includes(q))
-      : [...customers];
+    let filtered = customers.filter(c => {
+      const matchesSearch = !q || c.name.toLowerCase().includes(q) || c.phone.includes(q);
+      const type = c.cycleType || "days";
+      const matchesFilter =
+        customerFilter === "all" ||
+        (customerFilter === "active" && c.active && type !== "irregular") ||
+        (customerFilter === "irregular" && type === "irregular") ||
+        (customerFilter === "paused" && !c.active);
+      return matchesSearch && matchesFilter;
+    });
 
     if (filtered.length === 0) {
-      list.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--text3);font-size:14px;">${q ? "검색 결과 없음" : "등록된 고객이 없어요"}</div>`;
+      list.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--text3);font-size:14px;">${q || customerFilter !== "all" ? "검색 결과 없음" : "등록된 고객이 없어요"}</div>`;
       return;
     }
 
@@ -791,6 +807,12 @@
       </div>`;
     }).join("");
   }
+
+  window.setCustomerFilter = function(filter) {
+    customerFilter = filter;
+    document.querySelectorAll(".filter-tab").forEach(btn => btn.classList.toggle("active", btn.dataset.filter === filter));
+    renderCustomers();
+  };
 
   // ── Form ──────────────────────────────────────────────────────────────────
   let goodsCnt = 0;
@@ -928,6 +950,8 @@
     } else if (cycleType === "monthly_weekday") {
       cycleData.weekNth = parseInt($("f-week-nth").value);
       cycleData.weekDay = parseInt($("f-week-day").value);
+    } else if (cycleType === "irregular") {
+      cycleData.nextDate = null;
     }
 
     const rows = document.querySelectorAll(".goods-row");
@@ -944,7 +968,9 @@
     try {
       if (editingCustomerId) {
         const c = customers.find(x => x.id === editingCustomerId);
-        await updateCustomer(editingCustomerId, { name, phone, address, memo, startDate, ...cycleData, goods });
+        const updateData = { name, phone, address, memo, startDate, ...cycleData, goods };
+        if (cycleType !== "irregular" && c && c.cycleType === "irregular") updateData.nextDate = null;
+        await updateCustomer(editingCustomerId, updateData);
         if (c) logChange("edit", name, "고객 정보 수정");
         showToast(name + " 고객 정보 수정 완료");
         editingCustomerId = null;
@@ -965,6 +991,9 @@
     const c = customers.find(x => x.id === id);
     if (!c) return;
     $("modal-name").value = c.name;
+    const isIrregular = (c.cycleType || "days") === "irregular";
+    $("modal-date-label").textContent = isIrregular ? "표시할 배송일" : "다음 배송일";
+    $("modal-cycle-group").style.display = isIrregular ? "none" : "block";
     $("modal-date").value = c.nextDate || getNextDelivery(c) || dateStr(new Date());
     $("modal-cycle").value = c.cycle;
     $("edit-overlay").classList.add("open");
@@ -979,10 +1008,11 @@
     const nextDate = $("modal-date").value;
     const cycle = parseInt($("modal-cycle").value) || 7;
     const c = customers.find(x => x.id === editingId);
+    const isIrregular = c && (c.cycleType || "days") === "irregular";
     setLoading(true);
     try {
-      await updateCustomer(editingId, { nextDate, cycle });
-      if (c) logChange("edit", c.name, "배송일 변경 → " + nextDate);
+      await updateCustomer(editingId, isIrregular ? { nextDate } : { nextDate, cycle });
+      if (c) logChange("edit", c.name, (isIrregular ? "비정기 배송일 지정 → " : "배송일 변경 → ") + nextDate);
       closeModal();
       showToast("저장됐어요");
     } catch (e) {
@@ -1030,12 +1060,14 @@
 
   function todayKey() { return new Date().toISOString().slice(0,10); }
 
-  function loadChanges() {
+  let selectedChangeDate = todayKey();
+
+  function loadChanges(date = selectedChangeDate) {
     try {
       const raw = localStorage.getItem(CHANGES_KEY);
       if (!raw) return [];
       const all = JSON.parse(raw);
-      return all.filter(c => c.date === todayKey());
+      return all.filter(c => c.date === date);
     } catch { return []; }
   }
 
@@ -1043,21 +1075,20 @@
     try {
       const raw = localStorage.getItem(CHANGES_KEY);
       const all = raw ? JSON.parse(raw) : [];
-      // 오늘 것만 최대 200개 보관
-      const filtered = all.filter(c => c.date === todayKey()).slice(-199);
       const now = new Date();
-      filtered.push({
+      all.push({
         date: todayKey(),
         type, name, desc,
         time: now.toTimeString().slice(0,8)
       });
-      localStorage.setItem(CHANGES_KEY, JSON.stringify(filtered));
+      localStorage.setItem(CHANGES_KEY, JSON.stringify(all.slice(-1000)));
       updateChangeBadge();
+      if ($("changes-list")) renderChanges();
     } catch {}
   }
 
   function updateChangeBadge() {
-    const changes = loadChanges();
+    const changes = loadChanges(todayKey());
     const navItems = document.querySelectorAll('[data-tab="changes"]');
     navItems.forEach(el => {
       const existing = el.querySelector(".badge-count");
@@ -1072,13 +1103,18 @@
   }
 
   function renderChanges() {
-    const changes = loadChanges();
+    const input = $("changes-picker");
+    if (input) {
+      if (!input.value) input.value = selectedChangeDate;
+      selectedChangeDate = input.value || todayKey();
+    }
+    const changes = loadChanges(selectedChangeDate);
     const list = $("changes-list");
     const dateEl = $("changes-date");
-    if (dateEl) dateEl.textContent = todayKey() + " 변경 내역";
+    if (dateEl) dateEl.textContent = selectedChangeDate + " 변경 내역";
     if (!list) return;
     if (changes.length === 0) {
-      list.innerHTML = `<div class="changes-empty">오늘 변경사항이 없어요</div>`;
+      list.innerHTML = `<div class="changes-empty">선택한 날짜의 변경사항이 없어요</div>`;
       return;
     }
     const typeMap = { add: { label: "등록", cls: "add" }, edit: { label: "수정", cls: "edit" }, delete: { label: "삭제", cls: "delete" }, pause: { label: "상태", cls: "pause" } };
@@ -1094,10 +1130,15 @@
       </div>`;
     }).join("");
   }
+  window.renderChanges = renderChanges;
 
   window.clearChanges = function() {
-    if (!confirm("오늘 변경 기록을 지울까요?")) return;
-    localStorage.removeItem(CHANGES_KEY);
+    if (!confirm(selectedChangeDate + " 변경 기록을 지울까요?")) return;
+    try {
+      const raw = localStorage.getItem(CHANGES_KEY);
+      const all = raw ? JSON.parse(raw) : [];
+      localStorage.setItem(CHANGES_KEY, JSON.stringify(all.filter(c => c.date !== selectedChangeDate)));
+    } catch {}
     renderChanges();
     updateChangeBadge();
   };
@@ -1191,18 +1232,11 @@
     <!-- Changes tab -->
     <div id="tab-changes" class="section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-        <div class="page-title" style="margin-bottom:0;">오늘 변경사항</div>
-        <button class="btn" onclick="clearChanges()">기록 지우기</button>
-      </div>
-      <div id="changes-date" style="font-size:13px;color:var(--text3);margin-bottom:16px;"></div>
-      <div id="changes-list"></div>
-    </div>
-
-    <!-- Changes tab -->
-    <div id="tab-changes" class="section">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-        <div class="page-title" style="margin-bottom:0;">오늘 변경사항</div>
-        <button class="btn" onclick="clearChanges()">기록 지우기</button>
+        <div class="page-title" style="margin-bottom:0;">변경사항</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="date" id="changes-picker" onchange="renderChanges()" style="padding:7px 10px;font-size:13px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;">
+          <button class="btn" onclick="clearChanges()">기록 지우기</button>
+        </div>
       </div>
       <div id="changes-date" style="font-size:13px;color:var(--text3);margin-bottom:16px;"></div>
       <div id="changes-list"></div>
@@ -1213,6 +1247,12 @@
       <div class="page-title">고객 목록</div>
       <div class="search-wrap">
         <input type="text" class="search-input" id="search-input" placeholder="고객명 또는 전화번호 검색" oninput="onSearchInput()">
+      </div>
+      <div class="filter-tabs">
+        <button class="filter-tab active" data-filter="all" onclick="setCustomerFilter('all')">전체</button>
+        <button class="filter-tab" data-filter="active" onclick="setCustomerFilter('active')">정기 고객</button>
+        <button class="filter-tab" data-filter="irregular" onclick="setCustomerFilter('irregular')">비정기 고객</button>
+        <button class="filter-tab" data-filter="paused" onclick="setCustomerFilter('paused')">보류</button>
       </div>
       <div class="customer-list" id="customer-list"></div>
     </div>
@@ -1236,6 +1276,7 @@
             <button class="cycle-tab" data-type="monthly_day" onclick="setCycleTab('monthly_day')">매달 N일마다</button>
             <button class="cycle-tab" data-type="n_weekly" onclick="setCycleTab('n_weekly')">N주 N요일마다</button>
             <button class="cycle-tab" data-type="monthly_weekday" onclick="setCycleTab('monthly_weekday')">매달 N번째 요일</button>
+            <button class="cycle-tab" data-type="irregular" onclick="setCycleTab('irregular')">비정기</button>
           </div>
           <div class="cycle-panel active" data-panel="days">
             <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
@@ -1252,6 +1293,11 @@
               <button class="weekday-btn" onclick="toggleWeekday(this,4)">목</button>
               <button class="weekday-btn" onclick="toggleWeekday(this,5)">금</button>
               <button class="weekday-btn" onclick="toggleWeekday(this,6)">토</button>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="irregular">
+            <div style="font-size:13px;color:var(--text2);margin-top:4px;">
+              자동 반복 없이 고객 목록에 보관하고, 배송일 변경에서 다음 배송일을 지정한 날짜에만 캘린더에 표시합니다.
             </div>
           </div>
           <div class="cycle-panel" data-panel="monthly_day">
@@ -1317,8 +1363,8 @@
   <div class="modal">
     <h3>배송 일정 변경</h3>
     <div class="form-group"><label>고객명</label><input type="text" id="modal-name" readonly></div>
-    <div class="form-group"><label>다음 배송일</label><input type="date" id="modal-date"></div>
-    <div class="form-group"><label>발송 주기 (일)</label><input type="number" id="modal-cycle" min="1"></div>
+    <div class="form-group"><label id="modal-date-label">다음 배송일</label><input type="date" id="modal-date"></div>
+    <div class="form-group" id="modal-cycle-group"><label>발송 주기 (일)</label><input type="number" id="modal-cycle" min="1"></div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal()">취소</button>
       <button class="btn btn-primary" onclick="saveEdit()">저장</button>
