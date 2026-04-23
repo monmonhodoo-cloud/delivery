@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>?뺢린諛곗넚 ?몃옒而?/title>
+<title>정기배송 트래커</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
 
@@ -954,18 +954,18 @@
           <span class="badge ${c.active ? "badge-on" : "badge-off"}">${c.active ? "배송중" : "일시정지"}</span>
         </div>
         <div class="cust-grid">
-          <span class="cust-grid-label">二쇱냼</span><span class="cust-grid-val">${c.address}</span>
-          ${c.memo ? `<span class="cust-grid-label">硫붾え</span><span class="cust-grid-val">${c.memo}</span>` : ""}
-          <span class="cust-grid-label">?곹뭹</span><span class="cust-grid-val">${goods}</span>
-          <span class="cust-grid-label">諛쒖넚 二쇨린</span><span class="cust-grid-val">${cycleLabel(c)}</span>
-          <span class="cust-grid-label">?쒖옉??/span><span class="cust-grid-val">${c.startDate}</span>
+          <span class="cust-grid-label">주소</span><span class="cust-grid-val">${c.address}</span>
+          ${c.memo ? `<span class="cust-grid-label">메모</span><span class="cust-grid-val">${c.memo}</span>` : ""}
+          <span class="cust-grid-label">상품</span><span class="cust-grid-val">${goods}</span>
+          <span class="cust-grid-label">발송 주기</span><span class="cust-grid-val">${cycleLabel(c)}</span>
+          <span class="cust-grid-label">시작일</span><span class="cust-grid-val">${c.startDate}</span>
         </div>
-        ${next ? `<div class="next-box"><span class="next-box-label">?ㅼ쓬 諛곗넚??/span><span class="next-box-date">${next}</span></div>` : ""}
+        ${next ? `<div class="next-box"><span class="next-box-label">다음 배송일</span><span class="next-box-date">${next}</span></div>` : ""}
         <div class="cust-actions">
-          <button class="btn" onclick="openCustomerEdit('${c.id}')">?섏젙</button>
-          <button class="btn" onclick="openEdit('${c.id}')">諛곗넚??蹂寃?/button>
-          <button class="btn" onclick="toggleActive('${c.id}')">${c.active ? "?쇱떆?뺤?" : "諛곗넚 ?ш컻"}</button>
-          <button class="btn btn-danger" onclick="confirmDelete('${c.id}', '${c.name}')">??젣</button>
+          <button class="btn" onclick="openCustomerEdit('${c.id}')">수정</button>
+          <button class="btn" onclick="openEdit('${c.id}')">배송일 변경</button>
+          <button class="btn" onclick="toggleActive('${c.id}')">${c.active ? "일시정지" : "배송 재개"}</button>
+          <button class="btn btn-danger" onclick="confirmDelete('${c.id}', '${c.name}')">삭제</button>
         </div>
       </div>`;
     }).join("");
@@ -981,9 +981,9 @@
   window.openDatePanel = function(ds) {
     const list = customers.map(c => getDeliveryOccurrence(c, ds)).filter(Boolean);
     $("date-panel-title").textContent = ds;
-    $("date-panel-sub").textContent = `${list.length}嫄?;
+    $("date-panel-sub").textContent = `${list.length}건`;
     $("date-panel-list").innerHTML = list.length === 0
-      ? `<div class="side-empty">?대떦 ?좎쭨 諛곗넚???놁뼱??/div>`
+      ? `<div class="side-empty">해당 날짜 배송이 없어요</div>`
       : list.map(occ => {
           const c = occ.customer;
           const goods = c.goods.map(g => `${g.name} ${g.qty}${g.unit}`).join(" / ");
@@ -992,11 +992,11 @@
             <div class="side-item-goods">${goods}</div>
             ${occ.note && occ.note.memo ? `<div class="side-item-note">${occ.note.memo}</div>` : ""}
             ${(occ.moved || (occ.note && occ.note.type === "combine")) ? `<div class="side-item-flags">
-              ${occ.moved ? `<span class="chip-flag moved">(蹂寃?</span>` : ""}
-              ${occ.note && occ.note.type === "combine" ? `<span class="chip-flag combine">(?⑸같??</span>` : ""}
+              ${occ.moved ? `<span class="chip-flag moved">(변경)</span>` : ""}
+              ${occ.note && occ.note.type === "combine" ? `<span class="chip-flag combine">(합배송)</span>` : ""}
             </div>` : ""}
             <div class="side-item-actions">
-              <button class="btn" onclick="openDeliveryNote('${c.id}', '${occ.scheduledDate}')">?뚯감 硫붾え/議곗젙</button>
+              <button class="btn" onclick="openDeliveryNote('${c.id}', '${occ.scheduledDate}')">회차 메모/조정</button>
             </div>
           </div>`;
         }).join("");
@@ -1481,7 +1481,7 @@
   <button class="top-nav-item" data-tab="monthly" onclick="switchTab('monthly')">?뿎截??붽컙</button>
   <button class="top-nav-item" data-tab="customers" onclick="switchTab('customers')">?뫁 怨좉컼</button>
   <button class="top-nav-item" data-tab="changes" onclick="switchTab('changes')">?뵒 蹂寃?/button>
-  <button class="top-nav-item" data-tab="add" onclick="switchTab('add')">???깅줉</button>
+  <button class="top-nav-item" data-tab="add" onclick="switchTab('add')">➕ 등록</button>
 </nav>
 
 <div class="layout">
@@ -1804,6 +1804,7 @@
 
 </body>
 </html>
+
 
 
 
