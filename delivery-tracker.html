@@ -500,7 +500,7 @@
     const dot = $("sync-dot");
     const label = $("sync-label");
     dot.className = "sync-dot " + (state === "ok" ? "ok" : state === "err" ? "err" : "");
-    label.textContent = state === "ok" ? "?ㅼ떆媛??곌껐?? : state === "err" ? "?곌껐 ?ㅻ쪟" : "?곌껐 以?..";
+    label.textContent = state === "ok" ? "실시간 연결됨" : state === "err" ? "연결 오류" : "연결 중...";
   }
 
   function setLoading(show) {
@@ -831,21 +831,18 @@
     const year = base.getFullYear();
     const month = base.getMonth();
 
-    $("monthly-title").textContent = `${year}??${month + 1}??;
+    $("monthly-title").textContent = `${year}년 ${month + 1}월`;
 
     const firstDay = new Date(year, month, 1).getDay();
     const lastDate = new Date(year, month + 1, 0).getDate();
 
     let html = `<div class="month-grid">`;
-    const dayNames = ["??,"??,"??,"??,"紐?,"湲?,"??];
+    const dayNames = ["일","월","화","수","목","금","토"];
     dayNames.forEach(d => { html += `<div class="month-header-cell">${d}</div>`; });
 
-    // ?댁쟾??鍮덉뭏
     for (let i = 0; i < firstDay; i++) {
       const prevDate = new Date(year, month, -firstDay + i + 1);
-      html += `<div class="month-cell other-month">
-        <div class="month-day-num" style="color:var(--text3)">${prevDate.getDate()}</div>
-      </div>`;
+      html += `<div class="month-cell other-month"><div class="month-day-num" style="color:var(--text3)">${prevDate.getDate()}</div></div>`;
     }
 
     for (let d = 1; d <= lastDate; d++) {
@@ -857,33 +854,29 @@
       const dowClass = dow === 0 ? "sun" : dow === 6 ? "sat" : "";
       const todayClass = isToday ? "today" : "";
 
-      html += `<div class="month-cell ${dowClass} ${todayClass}">
-        <div class="month-day-num">${d}</div>`;
+      html += `<div class="month-cell ${dowClass} ${todayClass}"><div class="month-day-num">${d}</div>`;
 
       const max = 2;
       deliveries.slice(0, max).forEach(occ => {
         const c = occ.customer;
         const flags = [
-          occ.moved ? "蹂寃? : "",
-          occ.note && occ.note.type === "combine" ? "?⑸같?? : ""
-        ].filter(Boolean).join(" 쨌 ");
-        html += `<div class="month-chip ${occ.moved ? "moved" : ""}" onclick="openDeliveryNote('${c.id}', '${occ.scheduledDate}')" title="${c.name}${flags ? " | " + flags : ""} | ${c.goods.map(g=>g.name+' '+g.qty+g.unit).join(', ')}">${c.name}${flags ? " 쨌 " + flags : ""}</div>`;
+          occ.moved ? "변경" : "",
+          occ.note && occ.note.type === "combine" ? "합배송" : ""
+        ].filter(Boolean).join(" · ");
+        html += `<div class="month-chip ${occ.moved ? "moved" : ""}" onclick="openDeliveryNote('${c.id}', '${occ.scheduledDate}')" title="${c.name}${flags ? " | " + flags : ""} | ${c.goods.map(g => g.name + ' ' + g.qty + g.unit).join(', ')}">${c.name}${flags ? " · " + flags : ""}</div>`;
       });
       if (deliveries.length > max) {
-        html += `<div class="month-more" onclick="openDatePanel('${ds}')">+${deliveries.length - max}紐???/div>`;
+        html += `<div class="month-more" onclick="openDatePanel('${ds}')">+${deliveries.length - max}명 더</div>`;
       }
 
       html += `</div>`;
     }
 
-    // ?ㅼ쓬??鍮덉뭏
     const totalCells = firstDay + lastDate;
     const remainder = totalCells % 7;
     if (remainder > 0) {
       for (let i = 1; i <= 7 - remainder; i++) {
-        html += `<div class="month-cell other-month">
-          <div class="month-day-num" style="color:var(--text3)">${i}</div>
-        </div>`;
+        html += `<div class="month-cell other-month"><div class="month-day-num" style="color:var(--text3)">${i}</div></div>`;
       }
     }
 
@@ -908,32 +901,23 @@
 
       const card = document.createElement("div");
       card.className = "day-card" + (isToday ? " today" : "");
-      let html = `<div class="day-weekday">${DAYS[d.getDay()]}?붿씪</div>
-                  <div class="day-date">${d.getMonth()+1}/${d.getDate()}</div>`;
+      let html = `<div class="day-weekday">${DAYS[d.getDay()]}요일</div><div class="day-date">${d.getMonth()+1}/${d.getDate()}</div>`;
       if (del.length === 0) {
-        html += `<div class="no-delivery">諛곗넚 ?놁쓬</div>`;
+        html += `<div class="no-delivery">배송 없음</div>`;
       } else {
         del.forEach(occ => {
           const c = occ.customer;
           const goods = c.goods.map(g => `${g.name} ${g.qty}${g.unit}`).join(", ");
-          html += `<div class="delivery-chip ${occ.moved ? "moved" : ""}" onclick="openDeliveryNote('${c.id}', '${occ.scheduledDate}')">
-            <div class="chip-name">${c.name}</div>
-            <div class="chip-goods">${goods}</div>
-            ${occ.note && occ.note.memo ? `<div class="chip-goods">${occ.note.memo}</div>` : ""}
-            ${(occ.moved || (occ.note && occ.note.type === "combine")) ? `<div class="chip-flags">
-              ${occ.moved ? `<span class="chip-flag moved">(蹂寃?</span>` : ""}
-              ${occ.note && occ.note.type === "combine" ? `<span class="chip-flag combine">(?⑸같??</span>` : ""}
-            </div>` : ""}
-          </div>`;
+          html += `<div class="delivery-chip ${occ.moved ? "moved" : ""}" onclick="openDeliveryNote('${c.id}', '${occ.scheduledDate}')"><div class="chip-name">${c.name}</div><div class="chip-goods">${goods}</div>${occ.note && occ.note.memo ? `<div class="chip-goods">${occ.note.memo}</div>` : ""}${(occ.moved || (occ.note && occ.note.type === "combine")) ? `<div class="chip-flags">${occ.moved ? `<span class="chip-flag moved">(변경)</span>` : ""}${occ.note && occ.note.type === "combine" ? `<span class="chip-flag combine">(합배송)</span>` : ""}</div>` : ""}</div>`;
         });
       }
       card.innerHTML = html;
       grid.appendChild(card);
     }
 
-    $("stat-today").textContent = todayCnt + "嫄?;
-    $("stat-week").textContent = weekCnt + "嫄?;
-    $("stat-active").textContent = customers.filter(c => c.active).length + "紐?;
+    $("stat-today").textContent = todayCnt + "건";
+    $("stat-week").textContent = weekCnt + "건";
+    $("stat-active").textContent = customers.filter(c => c.active).length + "명";
   }
 
   // ?? Customer list ?????????????????????????????????????????????????????????
@@ -954,7 +938,7 @@
     });
 
     if (filtered.length === 0) {
-      list.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--text3);font-size:14px;">${q || customerFilter !== "all" ? "寃??寃곌낵 ?놁쓬" : "?깅줉??怨좉컼???놁뼱??}</div>`;
+      list.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--text3);font-size:14px;">${q || customerFilter !== "all" ? "검색 결과가 없어요" : "등록된 고객이 없어요"}</div>`;
       return;
     }
 
@@ -967,7 +951,7 @@
             <div class="cust-name">${c.name}</div>
             <div class="cust-phone">${c.phone}</div>
           </div>
-          <span class="badge ${c.active ? "badge-on" : "badge-off"}">${c.active ? "諛곗넚以? : "?쇱떆?뺤?"}</span>
+          <span class="badge ${c.active ? "badge-on" : "badge-off"}">${c.active ? "배송중" : "일시정지"}</span>
         </div>
         <div class="cust-grid">
           <span class="cust-grid-label">二쇱냼</span><span class="cust-grid-val">${c.address}</span>
@@ -1080,7 +1064,7 @@
   function fillFormForEdit(c) {
     editingCustomerId = c.id;
     $("add-title").textContent = "怨좉컼 ?뺣낫 ?섏젙";
-    $("submit-customer-btn").textContent = "?섏젙 ???;
+    $("submit-customer-btn").textContent = "수정 저장";
     $("cancel-edit-btn").style.display = "block";
     $("f-name").value = c.name || "";
     $("f-phone").value = c.phone || "";
@@ -1126,10 +1110,10 @@
     const div = document.createElement("div");
     div.className = "goods-row"; div.id = id;
     div.innerHTML = `
-      <input type="text" placeholder="?곹뭹紐? class="gname">
-      <input type="number" placeholder="?섎웾" class="qty" min="1" value="1">
-      <select class="unit" style="flex:0.8;padding:8px 6px;font-size:13px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;"><option value="諛뺤뒪">諛뺤뒪</option><option value="媛?>媛?/option><option value="kg">kg</option></select>
-      <button class="remove-btn" onclick="document.getElementById('${id}').remove()" title="??젣">횞</button>`;
+      <input type="text" placeholder="상품명" class="gname">
+      <input type="number" placeholder="수량" class="qty" min="1" value="1">
+      <select class="unit" style="flex:0.8;padding:8px 6px;font-size:13px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;"><option value="박스">박스</option><option value="개">개</option><option value="kg">kg</option></select>
+      <button class="remove-btn" onclick="document.getElementById('${id}').remove()" title="삭제">×</button>`;
     $("goods-rows").appendChild(div);
   };
 
@@ -1201,10 +1185,10 @@
     rows.forEach(row => {
       const n = row.querySelector(".gname").value.trim();
       const qty = row.querySelector(".qty").value || "1";
-      const unit = row.querySelector(".unit").value.trim() || "媛?;
+      const unit = row.querySelector(".unit").value.trim() || "개";
       if (n) goods.push({ name: n, qty, unit });
     });
-    if (goods.length === 0) { showToast("?곹뭹??理쒖냼 1媛??낅젰?댁＜?몄슂", "err"); return; }
+    if (goods.length === 0) { showToast("상품은 최소 1개 입력해 주세요", "err"); return; }
 
     setLoading(true);
     try {
@@ -1577,7 +1561,7 @@
     <div id="tab-customers" class="section">
       <div class="page-title">怨좉컼 紐⑸줉</div>
       <div class="search-wrap">
-        <input type="text" class="search-input" id="search-input" placeholder="怨좉컼紐??먮뒗 ?꾪솕踰덊샇 寃?? oninput="onSearchInput()">
+        <input type="text" class="search-input" id="search-input" placeholder="고객명 또는 전화번호 검색" oninput="onSearchInput()">
       </div>
       <div class="filter-tabs">
         <button class="filter-tab active" data-filter="all" onclick="setCustomerFilter('all')">?꾩껜</button>
@@ -1593,7 +1577,7 @@
       <div class="page-title" id="add-title">?좉퇋 怨좉컼 ?깅줉</div>
       <div class="form-card">
         <div class="form-grid">
-          <div class="form-group"><label>怨좉컼紐?*</label><input type="text" id="f-name" placeholder="?띻만??></div>
+          <div class="form-group"><label>고객명 *</label><input type="text" id="f-name" placeholder="홍길동"></div>
           <div class="form-group"><label>?꾪솕踰덊샇 *</label><input type="text" id="f-phone" placeholder="010-0000-0000"></div>
           <div class="form-group full"><label>二쇱냼 *</label><input type="text" id="f-addr" placeholder="諛곗넚 二쇱냼"></div>
           <div class="form-group full"><label>硫붾え</label><textarea id="f-memo" placeholder="諛곗넚 ?붿껌?ы빆 ?먮뒗 李멸퀬 硫붾え"></textarea></div>
@@ -1820,6 +1804,7 @@
 
 </body>
 </html>
+
 
 
 
