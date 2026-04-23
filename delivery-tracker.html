@@ -707,7 +707,7 @@
     const changesQuery = query(collection(db, "changeLogs"), orderBy("createdAt", "asc"));
     changesUnsubscribe = onSnapshot(changesQuery,
       snapshot => {
-        changeLogs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        changeLogs = mergeChanges(snapshot.docs.map(d => ({ id: d.id, ...d.data() })), readStoredChanges());
         updateChangeBadge();
         if ($("changes-list")) renderChanges();
       },
@@ -744,7 +744,7 @@
       saveDemo();
       renderCalendar(); renderCustomers();
     }
-    logChange("add", data.name, "?좉퇋 怨좉컼 ?깅줉");
+    logChange("add", data.name, "신규 고객 등록");
   }
 
   async function updateCustomer(id, data) {
@@ -1014,8 +1014,8 @@
 
   function initForm() {
     editingCustomerId = null;
-    $("add-title").textContent = "?좉퇋 怨좉컼 ?깅줉";
-    $("submit-customer-btn").textContent = "?깅줉?섍린";
+    $("add-title").textContent = "신규 고객 등록";
+    $("submit-customer-btn").textContent = "등록하기";
     $("cancel-edit-btn").style.display = "none";
     $("f-name").value = "";
     $("f-phone").value = "";
@@ -1063,7 +1063,7 @@
 
   function fillFormForEdit(c) {
     editingCustomerId = c.id;
-    $("add-title").textContent = "怨좉컼 ?뺣낫 ?섏젙";
+    $("add-title").textContent = "고객 정보 수정";
     $("submit-customer-btn").textContent = "수정 저장";
     $("cancel-edit-btn").style.display = "block";
     $("f-name").value = c.name || "";
@@ -1197,7 +1197,7 @@
         const updateData = { name, phone, address, memo, startDate, ...cycleData, goods };
         if (cycleType !== "irregular" && c && c.cycleType === "irregular") updateData.nextDate = null;
         await updateCustomer(editingCustomerId, updateData);
-        if (c) logChange("edit", name, "怨좉컼 ?뺣낫 ?섏젙");
+        if (c) logChange("edit", name, "고객 정보 수정");
         showToast(name + " 怨좉컼 ?뺣낫 ?섏젙 ?꾨즺");
         editingCustomerId = null;
         switchTab("customers");
@@ -1367,9 +1367,27 @@
   function todayKey() { return formatLocalDateKey(new Date()); }
 
   let selectedChangeDate = todayKey();
+  function readStoredChanges() {
+    try { return JSON.parse(localStorage.getItem(CHANGES_KEY) || "[]"); }
+    catch { return []; }
+  }
+
+  function changeKey(c) {
+    return [c.createdAt || "", c.type || "", c.name || "", c.desc || "", c.time || ""].join("|");
+  }
+
+  function mergeChanges(primary = [], secondary = []) {
+    const map = new Map();
+    [...secondary, ...primary].forEach(c => {
+      if (!c) return;
+      map.set(changeKey(c), c);
+    });
+    return [...map.values()].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)).slice(-1000);
+  }
 
   function loadChanges(date = selectedChangeDate) {
-    return changeLogs.filter(c => c.date === date);
+    const merged = mergeChanges(changeLogs, readStoredChanges());
+    return merged.filter(c => c.date === date);
   }
 
   function logChange(type, name, desc) {
@@ -1382,18 +1400,15 @@
       time: now.toTimeString().slice(0,8),
       createdAt: now.getTime()
     };
-    if (db) {
-      addDoc(collection(db, "changeLogs"), entry).catch(err => {
-        console.error(err);
-        showToast("변경사항 저장 오류: " + err.message, "err");
-      });
-      return;
-    }
-    changeLogs.push(entry);
-    changeLogs = changeLogs.slice(-1000);
+    changeLogs = mergeChanges([...changeLogs, entry], readStoredChanges());
     saveDemoChanges();
     updateChangeBadge();
     if ($("changes-list")) renderChanges();
+    if (db) {
+      addDoc(collection(db, "changeLogs"), entry).catch(err => {
+        console.error(err);
+      });
+    }
   }
 
   function updateChangeBadge() {
@@ -1459,7 +1474,7 @@
   };
   // ?? Init ??????????????????????????????????????????????????????????????????
   document.addEventListener("DOMContentLoaded", () => {
-    if (IS_DEMO) {
+    changeLogs = mergeChanges(changeLogs, readStoredChanges());`r`n    if (IS_DEMO) {
       $("config-notice").classList.add("visible");
       setSyncStatus("err");
       loadDemo();
@@ -1804,6 +1819,7 @@
 
 </body>
 </html>
+
 
 
 
