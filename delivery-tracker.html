@@ -465,9 +465,11 @@
   }
 
   // ── Delivery logic ────────────────────────────────────────────────────────
-  // cycleType: "days" | "weekly" | "monthly_weekday"
+  // cycleType: "days" | "weekly" | "monthly_day" | "n_weekly" | "monthly_weekday"
   // days: N일마다
   // weekly: 매주 특정 요일(들) — weekdays: [0,1,...] (0=일)
+  // monthly_day: 매달 N일 — monthDay: 1~31
+  // n_weekly: N주마다 특정 요일 — weekInterval: 1~, weekDay: 0~6
   // monthly_weekday: 매달 N번째 요일 — weekNth: 1~5(-1=마지막), weekDay: 0~6
 
   function getNthWeekdayOfMonth(year, month, nth, weekday) {
@@ -514,6 +516,16 @@
       const days = c.weekdays || [];
       return days.includes(target.getDay());
     }
+    if (type === "monthly_day") {
+      const monthDay = Math.min(c.monthDay || 1, new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate());
+      return target.getDate() === monthDay;
+    }
+    if (type === "n_weekly") {
+      if (target.getDay() !== c.weekDay) return false;
+      const weekInterval = c.weekInterval || 1;
+      const diffDays = Math.round((target - baseDate) / 86400000);
+      return diffDays >= 0 && Math.floor(diffDays / 7) % weekInterval === 0;
+    }
     if (type === "monthly_weekday") {
       const d = getNthWeekdayOfMonth(target.getFullYear(), target.getMonth(), c.weekNth, c.weekDay);
       return d && dateStr(d) === ds;
@@ -541,6 +553,8 @@
       const days = (c.weekdays || []).map(d => dayNames[d] + "요일").join(", ");
       return `매주 ${days}`;
     }
+    if (type === "monthly_day") return `매달 ${c.monthDay}일마다`;
+    if (type === "n_weekly") return `${c.weekInterval || 1}주마다 ${dayNames[c.weekDay]}요일`;
     if (type === "monthly_weekday") {
       const nth = c.weekNth === -1 ? "마지막" : c.weekNth + "번째";
       return `매달 ${nth} ${dayNames[c.weekDay]}요일`;
