@@ -238,12 +238,13 @@
   .modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 18px; }
   .modal .form-group { margin-bottom: 14px; }
   .modal label { font-size: 12px; font-weight: 500; color: var(--text2); display: block; margin-bottom: 5px; }
-  .modal input {
+  .modal input, .modal select, .modal textarea {
     width: 100%; padding: 9px 11px; font-size: 14px;
     border: 0.5px solid var(--border-strong); border-radius: var(--radius);
     background: var(--surface); color: var(--text); font-family: inherit;
   }
-  .modal input:focus { outline: none; border-color: var(--accent); }
+  .modal textarea { min-height: 86px; resize: vertical; }
+  .modal input:focus, .modal select:focus, .modal textarea:focus { outline: none; border-color: var(--accent); }
   .modal input[readonly] { background: var(--surface2); color: var(--text2); }
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
 
@@ -416,7 +417,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import {
     getFirestore, collection, doc,
-    addDoc, updateDoc, deleteDoc,
+    addDoc, updateDoc, deleteDoc, setDoc,
     onSnapshot, query, orderBy
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -433,9 +434,11 @@
   const IS_DEMO = firebaseConfig.apiKey === "YOUR_API_KEY";
 
   // ── App init ──────────────────────────────────────────────────────────────
-  let app, db, unsubscribe;
+  let app, db, unsubscribe, notesUnsubscribe;
   let customers = [];
+  let deliveryNotes = [];
   let editingId = null;
+  let editingNoteKey = null;
 
   if (!IS_DEMO) {
     app = initializeApp(firebaseConfig);
@@ -588,15 +591,28 @@
         showToast("Firebase 연결 오류: " + err.message, "err");
       }
     );
+    const noteQuery = query(collection(db, "deliveryNotes"), orderBy("createdAt", "asc"));
+    notesUnsubscribe = onSnapshot(noteQuery,
+      snapshot => {
+        deliveryNotes = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderCalendar();
+        renderMonthly();
+      },
+      err => console.error(err)
+    );
   }
 
   // Demo mode: use localStorage
   function loadDemo() {
     try { customers = JSON.parse(localStorage.getItem("dt_demo") || "[]"); } catch { customers = []; }
+    try { deliveryNotes = JSON.parse(localStorage.getItem("dt_notes") || "[]"); } catch { deliveryNotes = []; }
     renderCalendar(); renderCustomers();
   }
   function saveDemo() {
     localStorage.setItem("dt_demo", JSON.stringify(customers));
+  }
+  function saveDemoNotes() {
+    localStorage.setItem("dt_notes", JSON.stringify(deliveryNotes));
   }
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -630,6 +646,40 @@
       customers = customers.filter(c => c.id !== id);
       saveDemo();
       renderCalendar(); renderCustomers();
+    }
+  }
+
+  function deliveryNoteId(customerId, date) {
+    return customerId + "_" + date;
+  }
+
+  function getDeliveryNote(customerId, date) {
+    const id = deliveryNoteId(customerId, date);
+    return deliveryNotes.find(n => (n.id || deliveryNoteId(n.customerId, n.date)) === id) || null;
+  }
+
+  async function saveDeliveryNote(note) {
+    const id = deliveryNoteId(note.customerId, note.date);
+    const data = { ...note, id, updatedAt: Date.now() };
+    if (!data.createdAt) data.createdAt = Date.now();
+    if (db) {
+      await setDoc(doc(db, "deliveryNotes", id), data);
+    } else {
+      const i = deliveryNotes.findIndex(n => n.id === id);
+      if (i >= 0) deliveryNotes[i] = { ...deliveryNotes[i], ...data };
+      else deliveryNotes.push(data);
+      saveDemoNotes();
+      renderCalendar(); renderMonthly();
+    }
+  }
+
+  async function deleteDeliveryNote(id) {
+    if (db) {
+      await deleteDoc(doc(db, "deliveryNotes", id));
+    } else {
+      deliveryNotes = deliveryNotes.filter(n => n.id !== id);
+      saveDemoNotes();
+      renderCalendar(); renderMonthly();
     }
   }
 
@@ -694,7 +744,9 @@
 
       const max = 2;
       deliveries.slice(0, max).forEach(c => {
-        html += `<div class="month-chip" onclick="openEdit('${c.id}')" title="${c.name} | ${c.goods.map(g=>g.name+' '+g.qty+g.unit).join(', ')}">${c.name}</div>`;
+        const note = getDeliveryNote(c.id, ds);
+        const noteMark = note ? " · " + (note.type === "combine" ? "합배송" : "메모") : "";
+        html += `<div class="month-chip" onclick="openDeliveryNote('${c.id}', '${ds}')" title="${c.name}${noteMark} | ${c.goods.map(g=>g.name+' '+g.qty+g.unit).join(', ')}">${c.name}${noteMark}</div>`;
       });
       if (deliveries.length > max) {
         html += `<div class="month-more">+${deliveries.length - max}명 더</div>`;
@@ -742,9 +794,12 @@
       } else {
         del.forEach(c => {
           const goods = c.goods.map(g => `${g.name} ${g.qty}${g.unit}`).join(", ");
-          html += `<div class="delivery-chip" onclick="openEdit('${c.id}')">
+          const note = getDeliveryNote(c.id, ds);
+          const noteLabel = note ? (note.type === "combine" ? "합배송" : "메모") : "";
+          html += `<div class="delivery-chip" onclick="openDeliveryNote('${c.id}', '${ds}')">
             <div class="chip-name">${c.name}</div>
             <div class="chip-goods">${goods}</div>
+            ${note ? `<div class="chip-goods">${noteLabel}: ${note.memo}</div>` : ""}
           </div>`;
         });
       }
@@ -982,6 +1037,67 @@
       }
     } catch (e) {
       showToast("저장 오류: " + e.message, "err");
+    } finally { setLoading(false); }
+  };
+
+  // ── Delivery note modal ──────────────────────────────────────────────────
+  window.openDeliveryNote = function(customerId, date) {
+    const c = customers.find(x => x.id === customerId);
+    if (!c) return;
+    const note = getDeliveryNote(customerId, date);
+    editingNoteKey = deliveryNoteId(customerId, date);
+    $("note-customer").value = c.name;
+    $("note-date").value = date;
+    $("note-type").value = note ? note.type : "combine";
+    $("note-memo").value = note ? note.memo : "";
+    $("delete-note-btn").style.display = note ? "inline-block" : "none";
+    $("note-overlay").classList.add("open");
+  };
+
+  window.closeNoteModal = function() {
+    $("note-overlay").classList.remove("open");
+    editingNoteKey = null;
+  };
+
+  window.saveNote = async function() {
+    if (!editingNoteKey) return;
+    const date = editingNoteKey.slice(-10);
+    const customerId = editingNoteKey.slice(0, -11);
+    const c = customers.find(x => x.id === customerId);
+    const type = $("note-type").value;
+    const memo = $("note-memo").value.trim();
+    if (!memo) { showToast("회차 메모 내용을 입력해주세요", "err"); return; }
+    setLoading(true);
+    try {
+      const existing = getDeliveryNote(customerId, date);
+      await saveDeliveryNote({
+        customerId,
+        date,
+        type,
+        memo,
+        createdAt: existing ? existing.createdAt : Date.now()
+      });
+      if (c) logChange("edit", c.name, `${date} 회차 ${type === "combine" ? "합배송" : "메모"} 저장`);
+      closeNoteModal();
+      showToast("회차 메모 저장 완료");
+    } catch (e) {
+      showToast("저장 오류: " + e.message, "err");
+    } finally { setLoading(false); }
+  };
+
+  window.deleteNote = async function() {
+    if (!editingNoteKey) return;
+    const note = deliveryNotes.find(n => n.id === editingNoteKey);
+    const c = note ? customers.find(x => x.id === note.customerId) : null;
+    if (!confirm("이 회차 메모를 삭제할까요?")) return;
+    setLoading(true);
+    try {
+      await deleteDeliveryNote(editingNoteKey);
+      if (c) logChange("delete", c.name, note.date + " 회차 메모 삭제");
+      closeNoteModal();
+      showToast("회차 메모 삭제 완료");
+    } catch (e) {
+      showToast("삭제 오류: " + e.message, "err");
     } finally { setLoading(false); }
   };
 
@@ -1356,6 +1472,28 @@
     </div>
 
   </main>
+</div>
+
+<!-- Delivery note modal -->
+<div class="overlay" id="note-overlay">
+  <div class="modal">
+    <h3>회차 메모</h3>
+    <div class="form-group"><label>고객명</label><input type="text" id="note-customer" readonly></div>
+    <div class="form-group"><label>배송일</label><input type="date" id="note-date" readonly></div>
+    <div class="form-group">
+      <label>유형</label>
+      <select id="note-type">
+        <option value="combine">합배송</option>
+        <option value="memo">메모</option>
+      </select>
+    </div>
+    <div class="form-group"><label>내용</label><textarea id="note-memo" placeholder="예: 김철수 주문 함께 배송"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="delete-note-btn" onclick="deleteNote()" style="margin-right:auto;display:none;">삭제</button>
+      <button class="btn" onclick="closeNoteModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveNote()">저장</button>
+    </div>
+  </div>
 </div>
 
 <!-- Edit modal -->
