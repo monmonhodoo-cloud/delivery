@@ -485,7 +485,7 @@
   const dateStr = d => d.toISOString().slice(0, 10);
   const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
   const parseDate = s => new Date(s + "T00:00:00");
-  const DAYS = ["??,"??,"??,"??,"紐?,"湲?,"??];
+  const DAYS = ["일","월","화","수","목","금","토"];
   const CHANGES_KEY = "delivery_changes";
 
   function showToast(msg, type = "normal") {
@@ -649,30 +649,30 @@
 
   function cycleLabel(c) {
     const type = c.cycleType || "days";
-    const dayNames = ["??,"??,"??,"??,"紐?,"湲?,"??];
-    if (type === "days") return `${c.cycle}?쇰쭏??;
+    const dayNames = ["일","월","화","수","목","금","토"];
+    if (type === "days") return `${c.cycle}일마다`;
     if (type === "weekly") {
-      const days = (c.weekdays || []).map(d => dayNames[d] + "?붿씪").join(", ");
-      return `留ㅼ＜ ${days}`;
+      const days = (c.weekdays || []).map(d => dayNames[d] + "요일").join(", ");
+      return `매주 ${days}`;
     }
-    if (type === "monthly_day") return `留ㅻ떖 ${c.monthDay}?쇰쭏??;
-    if (type === "n_weekly") return `${c.weekInterval || 1}二쇰쭏??${dayNames[c.weekDay]}?붿씪`;
-    if (type === "n_months") return `${c.monthInterval || 1}?щ쭏??;
-    if (type === "n_weeks") return `${c.onlyWeekInterval || 1}二쇰쭏??;
-    if (type === "odd_month_day") return `??섎떖 ${c.oddMonthDay}??;
-    if (type === "even_month_day") return `吏앹닔??${c.evenMonthDay}??;
+    if (type === "monthly_day") return `매달 ${c.monthDay}일마다`;
+    if (type === "n_weekly") return `${c.weekInterval || 1}주마다 ${dayNames[c.weekDay]}요일`;
+    if (type === "n_months") return `${c.monthInterval || 1}달마다`;
+    if (type === "n_weeks") return `${c.onlyWeekInterval || 1}주마다`;
+    if (type === "odd_month_day") return `홀수달 ${c.oddMonthDay}일`;
+    if (type === "even_month_day") return `짝수달 ${c.evenMonthDay}일`;
     if (type === "odd_month_weekday") {
-      const oddNth = c.oddWeekNth === -1 ? "留덉?留? : c.oddWeekNth + "踰덉㎏";
-      return `??섎떖 ${oddNth} ${dayNames[c.oddWeekDay]}?붿씪`;
+      const oddNth = c.oddWeekNth === -1 ? "마지막" : c.oddWeekNth + "번째";
+      return `홀수달 ${oddNth} ${dayNames[c.oddWeekDay]}요일`;
     }
     if (type === "even_month_weekday") {
-      const evenNth = c.evenWeekNth === -1 ? "留덉?留? : c.evenWeekNth + "踰덉㎏";
-      return `吏앹닔??${evenNth} ${dayNames[c.evenWeekDay]}?붿씪`;
+      const evenNth = c.evenWeekNth === -1 ? "마지막" : c.evenWeekNth + "번째";
+      return `짝수달 ${evenNth} ${dayNames[c.evenWeekDay]}요일`;
     }
-    if (type === "irregular") return "鍮꾩젙湲?;
+    if (type === "irregular") return "비정기";
     if (type === "monthly_weekday") {
-      const nth = c.weekNth === -1 ? "留덉?留? : c.weekNth + "踰덉㎏";
-      return `留ㅻ떖 ${nth} ${dayNames[c.weekDay]}?붿씪`;
+      const nth = c.weekNth === -1 ? "마지막" : c.weekNth + "번째";
+      return `매달 ${nth} ${dayNames[c.weekDay]}요일`;
     }
     return "-";
   }
@@ -1256,7 +1256,7 @@
     const memo = $("note-memo").value.trim();
     const actualDate = $("note-actual-date").value;
     const normalizedActualDate = actualDate && actualDate !== date ? actualDate : null;
-    if (!memo && !normalizedActualDate) { showToast("硫붾え ?먮뒗 ?ㅼ젣 諛곗넚??議곗젙 ?댁슜???낅젰?댁＜?몄슂", "err"); return; }
+    if (!memo && !normalizedActualDate) { showToast("메모 또는 실제 배송일 조정 내용을 입력해 주세요", "err"); return; }
     setLoading(true);
     try {
       const existing = getDeliveryNote(customerId, date);
@@ -1270,14 +1270,14 @@
       });
       if (c) {
         const descParts = [];
-        if (normalizedActualDate) descParts.push(`?ㅼ젣 諛곗넚??${normalizedActualDate}`);
-        if (memo) descParts.push(type === "combine" ? "?⑸같??硫붾え" : "?뚯감 硫붾え");
-        logChange("edit", c.name, `${date} ?뚯감 ${descParts.join(" / ")} ???);
+        if (normalizedActualDate) descParts.push(`실제 배송일 ${normalizedActualDate}`);
+        if (memo) descParts.push(type === "combine" ? "합배송 메모" : "회차 메모");
+        logChange("edit", c.name, `${date} 회차 ${descParts.join(" / ")} 저장`);
       }
       closeNoteModal();
-      showToast("?뚯감 硫붾え ????꾨즺");
+      showToast("회차 메모 저장 완료");
     } catch (e) {
-      showToast("????ㅻ쪟: " + e.message, "err");
+      showToast("저장 오류: " + e.message, "err");
     } finally { setLoading(false); }
   };
 
@@ -1305,7 +1305,7 @@
     $("modal-name").value = c.name;
     const type = c.cycleType || "days";
     const isIrregular = type === "irregular";
-    $("modal-date-label").textContent = isIrregular ? "?쒖떆??諛곗넚?? : "?ㅼ쓬 諛곗넚??;
+    $("modal-date-label").textContent = isIrregular ? "표시할 배송일" : "다음 배송일";
     $("modal-cycle-group").style.display = type === "days" ? "block" : "none";
     $("modal-date").value = c.nextDate || getNextDelivery(c) || dateStr(new Date());
     $("modal-cycle").value = c.cycle;
@@ -1327,11 +1327,11 @@
     try {
       const updateData = type === "days" ? { nextDate, cycle } : { nextDate };
       await updateCustomer(editingId, updateData);
-      if (c) logChange("edit", c.name, (isIrregular ? "鍮꾩젙湲?諛곗넚??吏????" : "諛곗넚??蹂寃???") + nextDate);
+      if (c) logChange("edit", c.name, (isIrregular ? "비정기 배송일 지정 → " : "배송일 변경 → ") + nextDate);
       closeModal();
-      showToast("??λ릱?댁슂");
+      showToast("저장됐어요");
     } catch (e) {
-      showToast("????ㅻ쪟: " + e.message, "err");
+      showToast("저장 오류: " + e.message, "err");
     } finally { setLoading(false); }
   };
 
@@ -1357,14 +1357,14 @@
 
   async function doDelete(id) {
     const c = customers.find(x => x.id === id);
-    const name = c ? c.name : "怨좉컼";
+    const name = c ? c.name : "고객";
     setLoading(true);
     try {
       await deleteCustomer(id);
-      logChange("delete", name, "怨좉컼 ??젣");
-      showToast("??젣?먯뼱??);
+      logChange("delete", name, "고객 삭제");
+      showToast("삭제됐어요");
     } catch (e) {
-      showToast("??젣 ?ㅻ쪟: " + e.message, "err");
+      showToast("삭제 오류: " + e.message, "err");
     } finally { setLoading(false); }
   }
 
@@ -1820,6 +1820,7 @@
 
 </body>
 </html>
+
 
 
 
