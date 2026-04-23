@@ -1082,7 +1082,7 @@
   }
 
   window.setCycleTab = function(type) {
-    document.querySelectorAll(".cycle-tab").forEach(b => b.classList.toggle("active", b.dataset.type === type));
+    if ($("f-cycle-type")) $("f-cycle-type").value = type;
     document.querySelectorAll(".cycle-panel").forEach(p => p.classList.toggle("active", p.dataset.panel === type));
   };
 
@@ -1125,8 +1125,7 @@
     if (!name || !phone || !address || !startDate) { showToast("필수 항목을 모두 입력해주세요", "err"); return; }
 
     // 주기 타입 파악
-    const activeTab = document.querySelector(".cycle-tab.active");
-    const cycleType = activeTab ? activeTab.dataset.type : "days";
+    const cycleType = $("f-cycle-type").value || "days";
     let cycleData = { cycleType };
 
     if (cycleType === "days") {
@@ -1556,18 +1555,18 @@
         </div>
         <div class="form-group" style="margin-bottom:14px;">
           <label>발송 주기 *</label>
-          <div class="cycle-type-tabs" style="margin-top:6px;">
-            <button class="cycle-tab active" data-type="days" onclick="setCycleTab('days')">N일마다</button>
-            <button class="cycle-tab" data-type="weekly" onclick="setCycleTab('weekly')">매주 요일</button>
-            <button class="cycle-tab" data-type="monthly_day" onclick="setCycleTab('monthly_day')">매달 N일마다</button>
-            <button class="cycle-tab" data-type="n_weekly" onclick="setCycleTab('n_weekly')">N주 N요일마다</button>
-            <button class="cycle-tab" data-type="monthly_weekday" onclick="setCycleTab('monthly_weekday')">매달 N번째 요일</button>
-            <button class="cycle-tab" data-type="n_months" onclick="setCycleTab('n_months')">N달마다</button>
-            <button class="cycle-tab" data-type="n_weeks" onclick="setCycleTab('n_weeks')">N주마다</button>
-            <button class="cycle-tab" data-type="odd_even_month_day" onclick="setCycleTab('odd_even_month_day')">홀수달/짝수달 N일</button>
-            <button class="cycle-tab" data-type="odd_even_month_weekday" onclick="setCycleTab('odd_even_month_weekday')">홀수달/짝수달 N째주 요일</button>
-            <button class="cycle-tab" data-type="irregular" onclick="setCycleTab('irregular')">비정기</button>
-          </div>
+          <select id="f-cycle-type" onchange="setCycleTab(this.value)" style="margin-top:6px;">
+            <option value="days">N일마다</option>
+            <option value="weekly">매주 요일</option>
+            <option value="monthly_day">매달 N일마다</option>
+            <option value="n_weekly">N주 N요일마다</option>
+            <option value="monthly_weekday">매달 N번째 요일</option>
+            <option value="n_months">N달마다</option>
+            <option value="n_weeks">N주마다</option>
+            <option value="odd_even_month_day">홀수달/짝수달 N일</option>
+            <option value="odd_even_month_weekday">홀수달/짝수달 N째주 요일</option>
+            <option value="irregular">비정기</option>
+          </select>
           <div class="cycle-panel active" data-panel="days">
             <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
               <input type="number" id="f-cycle" min="1" value="7" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
