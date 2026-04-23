@@ -1478,9 +1478,9 @@
 <nav class="top-nav" id="top-nav">
   <span class="top-nav-logo">諛곗넚 ?몃옒而?/span>
   <button class="top-nav-item active" data-tab="calendar" onclick="switchTab('calendar')">?뱟 二쇨컙</button>
-  <button class="top-nav-item" data-tab="monthly" onclick="switchTab('monthly')">?뿎截??붽컙</button>
-  <button class="top-nav-item" data-tab="customers" onclick="switchTab('customers')">?뫁 怨좉컼</button>
-  <button class="top-nav-item" data-tab="changes" onclick="switchTab('changes')">?뵒 蹂寃?/button>
+  <button class="top-nav-item" data-tab="monthly" onclick="switchTab('monthly')">🗓️ 월간</button>
+  <button class="top-nav-item" data-tab="customers" onclick="switchTab('customers')">👥 고객</button>
+  <button class="top-nav-item" data-tab="changes" onclick="switchTab('changes')">🔔 변경</button>
   <button class="top-nav-item" data-tab="add" onclick="switchTab('add')">➕ 등록</button>
 </nav>
 
@@ -1488,25 +1488,25 @@
 
   <!-- Sidebar -->
   <nav class="sidebar">
-    <div class="logo"><div class="logo-dot"></div>諛곗넚 ?몃옒而?/div>
+    <div class="logo"><div class="logo-dot"></div>배송 트래커</div>
     <div class="nav-item active" data-tab="calendar" onclick="switchTab('calendar')">
-      <span class="nav-icon">?뱟</span> 二쇨컙 罹섎┛??
+      <span class="nav-icon">📅</span> 주간 캘린더
     </div>
     <div class="nav-item" data-tab="monthly" onclick="switchTab('monthly')">
-      <span class="nav-icon">?뿎截?/span> ?붽컙 罹섎┛??
+      <span class="nav-icon">🗓️</span> 월간 캘린더
     </div>
     <div class="nav-item" data-tab="customers" onclick="switchTab('customers')">
-      <span class="nav-icon">?뫁</span> 怨좉컼 紐⑸줉
+      <span class="nav-icon">👥</span> 고객 목록
     </div>
     <div class="nav-item" data-tab="changes" onclick="switchTab('changes')">
-      <span class="nav-icon">?뵒</span> 蹂寃쎌궗??
+      <span class="nav-icon">🔔</span> 변경사항
     </div>
     <div class="nav-item" data-tab="add" onclick="switchTab('add')">
-      <span class="nav-icon">??/span> ?좉퇋 ?깅줉
+      <span class="nav-icon">➕</span> 신규 등록
     </div>
     <div class="sync-status">
       <div class="sync-dot" id="sync-dot"></div>
-      <span id="sync-label">?곌껐 以?..</span>
+      <span id="sync-label">연결 중...</span>
     </div>
   </nav>
 
@@ -1522,11 +1522,11 @@
 
     <!-- Calendar tab -->
     <div id="tab-calendar" class="section active">
-      <div class="page-title">二쇨컙 諛곗넚 ?꾪솴</div>
+      <div class="page-title">주간 배송 현황</div>
       <div class="summary-bar">
-        <div class="stat-card"><div class="stat-label">?ㅻ뒛 諛곗넚</div><div class="stat-val accent" id="stat-today">0嫄?/div></div>
-        <div class="stat-card"><div class="stat-label">?대쾲 二?珥?諛곗넚</div><div class="stat-val" id="stat-week">0嫄?/div></div>
-        <div class="stat-card"><div class="stat-label">?쒖꽦 怨좉컼</div><div class="stat-val" id="stat-active">0紐?/div></div>
+        <div class="stat-card"><div class="stat-label">오늘 배송</div><div class="stat-val accent" id="stat-today">0건</div></div>
+        <div class="stat-card"><div class="stat-label">이번 주 총 배송</div><div class="stat-val" id="stat-week">0건</div></div>
+        <div class="stat-card"><div class="stat-label">활성 고객</div><div class="stat-val" id="stat-active">0명</div></div>
       </div>
       <div class="week-grid" id="week-grid"></div>
     </div>
@@ -1536,9 +1536,9 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
         <div class="page-title" style="margin-bottom:0;" id="monthly-title"></div>
         <div style="display:flex;gap:8px;">
-          <button class="btn" onclick="changeMonth(-1)">? ?댁쟾</button>
-          <button class="btn" onclick="changeMonth(0)">?ㅻ뒛</button>
-          <button class="btn" onclick="changeMonth(1)">?ㅼ쓬 ??/button>
+          <button class="btn" onclick="changeMonth(-1)">← 이전</button>
+          <button class="btn" onclick="changeMonth(0)">오늘</button>
+          <button class="btn" onclick="changeMonth(1)">다음 →</button>
         </div>
       </div>
       <div id="monthly-grid"></div>
@@ -1547,10 +1547,10 @@
     <!-- Changes tab -->
     <div id="tab-changes" class="section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-        <div class="page-title" style="margin-bottom:0;">蹂寃쎌궗??/div>
+        <div class="page-title" style="margin-bottom:0;">변경사항</div>
         <div style="display:flex;gap:8px;align-items:center;">
           <input type="date" id="changes-picker" onchange="renderChanges()" style="padding:7px 10px;font-size:13px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;">
-          <button class="btn" onclick="clearChanges()">湲곕줉 吏?곌린</button>
+          <button class="btn" onclick="clearChanges()">기록 지우기</button>
         </div>
       </div>
       <div id="changes-date" style="font-size:13px;color:var(--text3);margin-bottom:16px;"></div>
@@ -1559,32 +1559,32 @@
 
     <!-- Customers tab -->
     <div id="tab-customers" class="section">
-      <div class="page-title">怨좉컼 紐⑸줉</div>
+      <div class="page-title">고객 목록</div>
       <div class="search-wrap">
         <input type="text" class="search-input" id="search-input" placeholder="고객명 또는 전화번호 검색" oninput="onSearchInput()">
       </div>
       <div class="filter-tabs">
-        <button class="filter-tab active" data-filter="all" onclick="setCustomerFilter('all')">?꾩껜</button>
-        <button class="filter-tab" data-filter="active" onclick="setCustomerFilter('active')">?뺢린 怨좉컼</button>
-        <button class="filter-tab" data-filter="irregular" onclick="setCustomerFilter('irregular')">鍮꾩젙湲?怨좉컼</button>
-        <button class="filter-tab" data-filter="paused" onclick="setCustomerFilter('paused')">蹂대쪟</button>
+        <button class="filter-tab active" data-filter="all" onclick="setCustomerFilter('all')">전체</button>
+        <button class="filter-tab" data-filter="active" onclick="setCustomerFilter('active')">정기 고객</button>
+        <button class="filter-tab" data-filter="irregular" onclick="setCustomerFilter('irregular')">비정기 고객</button>
+        <button class="filter-tab" data-filter="paused" onclick="setCustomerFilter('paused')">보류</button>
       </div>
       <div class="customer-list" id="customer-list"></div>
     </div>
 
     <!-- Add tab -->
     <div id="tab-add" class="section">
-      <div class="page-title" id="add-title">?좉퇋 怨좉컼 ?깅줉</div>
+      <div class="page-title" id="add-title">신규 고객 등록</div>
       <div class="form-card">
         <div class="form-grid">
           <div class="form-group"><label>고객명 *</label><input type="text" id="f-name" placeholder="홍길동"></div>
-          <div class="form-group"><label>?꾪솕踰덊샇 *</label><input type="text" id="f-phone" placeholder="010-0000-0000"></div>
-          <div class="form-group full"><label>二쇱냼 *</label><input type="text" id="f-addr" placeholder="諛곗넚 二쇱냼"></div>
-          <div class="form-group full"><label>硫붾え</label><textarea id="f-memo" placeholder="諛곗넚 ?붿껌?ы빆 ?먮뒗 李멸퀬 硫붾え"></textarea></div>
-          <div class="form-group"><label>?쒖옉??*</label><input type="date" id="f-start"></div>
+          <div class="form-group"><label>전화번호 *</label><input type="text" id="f-phone" placeholder="010-0000-0000"></div>
+          <div class="form-group full"><label>주소 *</label><input type="text" id="f-addr" placeholder="배송 주소"></div>
+          <div class="form-group full"><label>메모</label><textarea id="f-memo" placeholder="배송 요청사항 또는 참고 메모"></textarea></div>
+          <div class="form-group"><label>시작일 *</label><input type="date" id="f-start"></div>
         </div>
         <div class="form-group" style="margin-bottom:14px;">
-          <label>諛쒖넚 二쇨린 *</label>
+          <label>발송 주기 *</label>
           <select id="f-cycle-type" onchange="setCycleTab(this.value)" style="margin-top:6px;">
             <option value="days">N?쇰쭏??/option>
             <option value="weekly">留ㅼ＜ ?붿씪</option>
@@ -1733,13 +1733,13 @@
           </div>
         </div>
         <div class="goods-section">
-          <label>二쇰Ц ?곹뭹 *</label>
+          <label>주문 상품 *</label>
           <div id="goods-rows"></div>
-          <button class="add-goods-btn" onclick="addGoodsRow()">+ ?곹뭹 異붽?</button>
+          <button class="add-goods-btn" onclick="addGoodsRow()">+ 상품 추가</button>
         </div>
         <div style="display:flex;gap:8px;">
           <button class="btn" id="cancel-edit-btn" onclick="cancelCustomerEdit()" style="display:none;flex:1;padding:11px;">痍⑥냼</button>
-          <button class="btn btn-primary" id="submit-customer-btn" onclick="submitCustomer()" style="flex:2;padding:11px;">?깅줉?섍린</button>
+          <button class="btn btn-primary" id="submit-customer-btn" onclick="submitCustomer()" style="flex:2;padding:11px;">등록하기</button>
         </div>
       </div>
     </div>
@@ -1763,7 +1763,7 @@
     </div>
     <div class="form-group"><label>?댁슜</label><textarea id="note-memo" placeholder="?? 源泥좎닔 二쇰Ц ?④퍡 諛곗넚"></textarea></div>
     <div class="modal-actions">
-      <button class="btn btn-danger" id="delete-note-btn" onclick="deleteNote()" style="margin-right:auto;display:none;">??젣</button>
+      <button class="btn btn-danger" id="delete-note-btn" onclick="deleteNote()" style="margin-right:auto;display:none;">삭제</button>
       <button class="btn" onclick="closeNoteModal()">痍⑥냼</button>
       <button class="btn btn-primary" onclick="saveNote()">???/button>
     </div>
@@ -1787,10 +1787,10 @@
 <!-- Edit modal -->
 <div class="overlay" id="edit-overlay">
   <div class="modal">
-    <h3>諛곗넚 ?쇱젙 蹂寃?/h3>
-    <div class="form-group"><label>怨좉컼紐?/label><input type="text" id="modal-name" readonly></div>
-    <div class="form-group"><label id="modal-date-label">?ㅼ쓬 諛곗넚??/label><input type="date" id="modal-date"></div>
-    <div class="form-group" id="modal-cycle-group"><label>諛쒖넚 二쇨린 (??</label><input type="number" id="modal-cycle" min="1"></div>
+    <h3>배송 일정 변경</h3>
+    <div class="form-group"><label>고객명</label><input type="text" id="modal-name" readonly></div>
+    <div class="form-group"><label id="modal-date-label">다음 배송일</label><input type="date" id="modal-date"></div>
+    <div class="form-group" id="modal-cycle-group"><label>발송 주기 (일)</label><input type="number" id="modal-cycle" min="1"></div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal()">痍⑥냼</button>
       <button class="btn btn-primary" onclick="saveEdit()">???/button>
@@ -1804,6 +1804,7 @@
 
 </body>
 </html>
+
 
 
 
