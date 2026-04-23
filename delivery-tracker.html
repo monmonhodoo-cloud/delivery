@@ -1586,127 +1586,127 @@
         <div class="form-group" style="margin-bottom:14px;">
           <label>발송 주기 *</label>
           <select id="f-cycle-type" onchange="setCycleTab(this.value)" style="margin-top:6px;">
-            <option value="days">N?쇰쭏??/option>
-            <option value="weekly">留ㅼ＜ ?붿씪</option>
-            <option value="monthly_day">留ㅻ떖 N?쇰쭏??/option>
-            <option value="n_weekly">N二?N?붿씪留덈떎</option>
-            <option value="monthly_weekday">留ㅻ떖 N踰덉㎏ ?붿씪</option>
-            <option value="n_months">N?щ쭏??/option>
-            <option value="n_weeks">N二쇰쭏??/option>
-            <option value="odd_month_day">??섎떖 N??/option>
-            <option value="even_month_day">吏앹닔??N??/option>
-            <option value="odd_month_weekday">??섎떖 N吏몄＜ N?붿씪</option>
-            <option value="even_month_weekday">吏앹닔??N吏몄＜ N?붿씪</option>
-            <option value="irregular">鍮꾩젙湲?/option>
+            <option value="days">N일마다</option>
+            <option value="weekly">매주 요일</option>
+            <option value="monthly_day">매달 N일마다</option>
+            <option value="n_weekly">N주 N요일마다</option>
+            <option value="monthly_weekday">매달 N번째 요일</option>
+            <option value="n_months">N달마다</option>
+            <option value="n_weeks">N주마다</option>
+            <option value="odd_month_day">홀수달 N일</option>
+            <option value="even_month_day">짝수달 N일</option>
+            <option value="odd_month_weekday">홀수달 N째주 N요일</option>
+            <option value="even_month_weekday">짝수달 N째주 N요일</option>
+            <option value="irregular">비정기</option>
           </select>
           <div class="cycle-panel active" data-panel="days">
             <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
               <input type="number" id="f-cycle" min="1" value="7" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
-              <span style="font-size:13px;color:var(--text2);">?쇰쭏??諛쒖넚</span>
+              <span style="font-size:13px;color:var(--text2);">일마다 발송</span>
             </div>
           </div>
           <div class="cycle-panel" data-panel="weekly">
             <div class="weekday-checks">
-              <button class="weekday-btn" onclick="toggleWeekday(this,0)">??/button>
-              <button class="weekday-btn" onclick="toggleWeekday(this,1)">??/button>
-              <button class="weekday-btn" onclick="toggleWeekday(this,2)">??/button>
-              <button class="weekday-btn" onclick="toggleWeekday(this,3)">??/button>
-              <button class="weekday-btn" onclick="toggleWeekday(this,4)">紐?/button>
-              <button class="weekday-btn" onclick="toggleWeekday(this,5)">湲?/button>
-              <button class="weekday-btn" onclick="toggleWeekday(this,6)">??/button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,0)">일</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,1)">월</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,2)">화</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,3)">수</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,4)">목</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,5)">금</button>
+              <button class="weekday-btn" onclick="toggleWeekday(this,6)">토</button>
             </div>
           </div>
           <div class="cycle-panel" data-panel="irregular">
             <div style="font-size:13px;color:var(--text2);margin-top:4px;">
-              ?먮룞 諛섎났 ?놁씠 怨좉컼 紐⑸줉??蹂닿??섍퀬, 諛곗넚??蹂寃쎌뿉???ㅼ쓬 諛곗넚?쇱쓣 吏?뺥븳 ?좎쭨?먮쭔 罹섎┛?붿뿉 ?쒖떆?⑸땲??
+              자동 반복 없이 고객 목록에 보관하고, 배송일 변경에서 지정한 날짜에만 캘린더에 표시됩니다.
             </div>
           </div>
           <div class="cycle-panel" data-panel="monthly_day">
             <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
-              <span style="font-size:13px;color:var(--text2);">留ㅻ떖</span>
+              <span style="font-size:13px;color:var(--text2);">매달</span>
               <input type="number" id="f-month-day" min="1" max="31" value="1" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
-              <span style="font-size:13px;color:var(--text2);">?쇰쭏??諛쒖넚</span>
+              <span style="font-size:13px;color:var(--text2);">일마다 발송</span>
             </div>
           </div>
           <div class="cycle-panel" data-panel="n_weekly">
             <div class="nth-row">
               <input type="number" id="f-week-interval" min="1" value="2" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
-              <span style="font-size:13px;color:var(--text2);">二쇰쭏??/span>
+              <span style="font-size:13px;color:var(--text2);">주마다</span>
               <select id="f-n-week-day">
-                <option value="0">?쇱슂??/option>
-                <option value="1">?붿슂??/option>
-                <option value="2">?붿슂??/option>
-                <option value="3">?섏슂??/option>
-                <option value="4">紐⑹슂??/option>
-                <option value="5">湲덉슂??/option>
-                <option value="6">?좎슂??/option>
+                <option value="0">일요일</option>
+                <option value="1">월요일</option>
+                <option value="2">화요일</option>
+                <option value="3">수요일</option>
+                <option value="4">목요일</option>
+                <option value="5">금요일</option>
+                <option value="6">토요일</option>
               </select>
             </div>
           </div>
           <div class="cycle-panel" data-panel="monthly_weekday">
             <div class="nth-row">
               <select id="f-week-nth">
-                <option value="1">泥レ㎏</option>
-                <option value="2">?섏㎏</option>
-                <option value="3">?뗭㎏</option>
-                <option value="4">?룹㎏</option>
-                <option value="-1">留덉?留?/option>
+                <option value="1">첫째</option>
+                <option value="2">둘째</option>
+                <option value="3">셋째</option>
+                <option value="4">넷째</option>
+                <option value="-1">마지막</option>
               </select>
               <select id="f-week-day">
-                <option value="0">?쇱슂??/option>
-                <option value="1">?붿슂??/option>
-                <option value="2">?붿슂??/option>
-                <option value="3">?섏슂??/option>
-                <option value="4">紐⑹슂??/option>
-                <option value="5">湲덉슂??/option>
-                <option value="6">?좎슂??/option>
+                <option value="0">일요일</option>
+                <option value="1">월요일</option>
+                <option value="2">화요일</option>
+                <option value="3">수요일</option>
+                <option value="4">목요일</option>
+                <option value="5">금요일</option>
+                <option value="6">토요일</option>
               </select>
             </div>
           </div>
           <div class="cycle-panel" data-panel="n_months">
             <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
               <input type="number" id="f-month-interval" min="1" value="2" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
-              <span style="font-size:13px;color:var(--text2);">?щ쭏??諛쒖넚 (?쒖옉??湲곗?)</span>
+              <span style="font-size:13px;color:var(--text2);">달마다 발송 (시작일 기준)</span>
             </div>
           </div>
           <div class="cycle-panel" data-panel="n_weeks">
             <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
               <input type="number" id="f-only-week-interval" min="1" value="2" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
-              <span style="font-size:13px;color:var(--text2);">二쇰쭏??諛쒖넚 (?쒖옉???붿씪 湲곗?)</span>
+              <span style="font-size:13px;color:var(--text2);">주마다 발송 (시작일 요일 기준)</span>
             </div>
           </div>
           <div class="cycle-panel" data-panel="odd_month_day">
             <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
-              <span style="font-size:13px;color:var(--text2);">??섎떖</span>
+              <span style="font-size:13px;color:var(--text2);">홀수달</span>
               <input type="number" id="f-odd-month-day" min="1" max="31" value="1" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
-              <span style="font-size:13px;color:var(--text2);">??諛쒖넚</span>
+              <span style="font-size:13px;color:var(--text2);">일 발송</span>
             </div>
           </div>
           <div class="cycle-panel" data-panel="even_month_day">
             <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
-              <span style="font-size:13px;color:var(--text2);">吏앹닔??/span>
+              <span style="font-size:13px;color:var(--text2);">짝수달</span>
               <input type="number" id="f-even-month-day" min="1" max="31" value="2" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
-              <span style="font-size:13px;color:var(--text2);">??諛쒖넚</span>
+              <span style="font-size:13px;color:var(--text2);">일 발송</span>
             </div>
           </div>
           <div class="cycle-panel" data-panel="odd_month_weekday">
             <div class="nth-row">
               <span style="font-size:13px;color:var(--text2);align-self:center;">??섎떖</span>
               <select id="f-odd-week-nth">
-                <option value="1">泥レ㎏</option>
-                <option value="2">?섏㎏</option>
-                <option value="3">?뗭㎏</option>
-                <option value="4">?룹㎏</option>
-                <option value="-1">留덉?留?/option>
+                <option value="1">첫째</option>
+                <option value="2">둘째</option>
+                <option value="3">셋째</option>
+                <option value="4">넷째</option>
+                <option value="-1">마지막</option>
               </select>
               <select id="f-odd-week-day">
-                <option value="0">?쇱슂??/option>
-                <option value="1">?붿슂??/option>
-                <option value="2">?붿슂??/option>
-                <option value="3">?섏슂??/option>
-                <option value="4">紐⑹슂??/option>
-                <option value="5">湲덉슂??/option>
-                <option value="6">?좎슂??/option>
+                <option value="0">일요일</option>
+                <option value="1">월요일</option>
+                <option value="2">화요일</option>
+                <option value="3">수요일</option>
+                <option value="4">목요일</option>
+                <option value="5">금요일</option>
+                <option value="6">토요일</option>
               </select>
             </div>
           </div>
@@ -1714,20 +1714,20 @@
             <div class="nth-row">
               <span style="font-size:13px;color:var(--text2);align-self:center;">吏앹닔??/span>
               <select id="f-even-week-nth">
-                <option value="1">泥レ㎏</option>
-                <option value="2">?섏㎏</option>
-                <option value="3">?뗭㎏</option>
-                <option value="4">?룹㎏</option>
-                <option value="-1">留덉?留?/option>
+                <option value="1">첫째</option>
+                <option value="2">둘째</option>
+                <option value="3">셋째</option>
+                <option value="4">넷째</option>
+                <option value="-1">마지막</option>
               </select>
               <select id="f-even-week-day">
-                <option value="0">?쇱슂??/option>
-                <option value="1">?붿슂??/option>
-                <option value="2">?붿슂??/option>
-                <option value="3">?섏슂??/option>
-                <option value="4">紐⑹슂??/option>
-                <option value="5">湲덉슂??/option>
-                <option value="6">?좎슂??/option>
+                <option value="0">일요일</option>
+                <option value="1">월요일</option>
+                <option value="2">화요일</option>
+                <option value="3">수요일</option>
+                <option value="4">목요일</option>
+                <option value="5">금요일</option>
+                <option value="6">토요일</option>
               </select>
             </div>
           </div>
@@ -1738,7 +1738,7 @@
           <button class="add-goods-btn" onclick="addGoodsRow()">+ 상품 추가</button>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="btn" id="cancel-edit-btn" onclick="cancelCustomerEdit()" style="display:none;flex:1;padding:11px;">痍⑥냼</button>
+          <button class="btn" id="cancel-edit-btn" onclick="cancelCustomerEdit()" style="display:none;flex:1;padding:11px;">취소</button>
           <button class="btn btn-primary" id="submit-customer-btn" onclick="submitCustomer()" style="flex:2;padding:11px;">등록하기</button>
         </div>
       </div>
@@ -1750,22 +1750,22 @@
 <!-- Delivery note modal -->
 <div class="overlay" id="note-overlay">
   <div class="modal">
-    <h3>?뚯감 硫붾え</h3>
-    <div class="form-group"><label>怨좉컼紐?/label><input type="text" id="note-customer" readonly></div>
-    <div class="form-group"><label>?먮옒 ?덉젙??/label><input type="date" id="note-date" readonly></div>
-    <div class="form-group"><label>?ㅼ젣 諛곗넚??議곗젙</label><input type="date" id="note-actual-date"></div>
+    <h3>회차 메모</h3>
+    <div class="form-group"><label>고객명</label><input type="text" id="note-customer" readonly></div>
+    <div class="form-group"><label>원래 예정일</label><input type="date" id="note-date" readonly></div>
+    <div class="form-group"><label>실제 배송일 조정</label><input type="date" id="note-actual-date"></div>
     <div class="form-group">
-      <label>?좏삎</label>
+      <label>유형</label>
       <select id="note-type">
-        <option value="combine">?⑸같??/option>
-        <option value="memo">硫붾え</option>
+        <option value="combine">합배송</option>
+        <option value="memo">메모</option>
       </select>
     </div>
-    <div class="form-group"><label>?댁슜</label><textarea id="note-memo" placeholder="?? 源泥좎닔 二쇰Ц ?④퍡 諛곗넚"></textarea></div>
+    <div class="form-group"><label>내용</label><textarea id="note-memo" placeholder="예: 김철수 주문 함께 배송"></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-danger" id="delete-note-btn" onclick="deleteNote()" style="margin-right:auto;display:none;">삭제</button>
-      <button class="btn" onclick="closeNoteModal()">痍⑥냼</button>
-      <button class="btn btn-primary" onclick="saveNote()">???/button>
+      <button class="btn" onclick="closeNoteModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveNote()">저장</button>
     </div>
   </div>
 </div>
@@ -1804,6 +1804,7 @@
 
 </body>
 </html>
+
 
 
 
