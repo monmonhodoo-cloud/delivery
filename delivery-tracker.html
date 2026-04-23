@@ -506,7 +506,7 @@
   }
 
   // ── Delivery logic ────────────────────────────────────────────────────────
-  // cycleType: "days" | "weekly" | "monthly_day" | "n_weekly" | "monthly_weekday" | "n_months" | "n_weeks" | "odd_even_month_day" | "odd_even_month_weekday" | "irregular"
+  // cycleType: "days" | "weekly" | "monthly_day" | "n_weekly" | "monthly_weekday" | "n_months" | "n_weeks" | "odd_month_day" | "even_month_day" | "odd_month_weekday" | "even_month_weekday" | "irregular"
   // days: N일마다
   // weekly: 매주 특정 요일(들) — weekdays: [0,1,...] (0=일)
   // monthly_day: 매달 N일 — monthDay: 1~31
@@ -514,8 +514,10 @@
   // monthly_weekday: 매달 N번째 요일 — weekNth: 1~5(-1=마지막), weekDay: 0~6
   // n_months: N달마다 — monthInterval: 1~ (시작일의 일자 기준)
   // n_weeks: N주마다 — onlyWeekInterval: 1~ (시작일의 요일 기준)
-  // odd_even_month_day: 홀수달/짝수달 N일 — oddMonthDay, evenMonthDay
-  // odd_even_month_weekday: 홀수달/짝수달 N째주 N요일 — oddWeekNth, oddWeekDay, evenWeekNth, evenWeekDay
+  // odd_month_day: 홀수달 N일 — oddMonthDay
+  // even_month_day: 짝수달 N일 — evenMonthDay
+  // odd_month_weekday: 홀수달 N째주 N요일 — oddWeekNth, oddWeekDay
+  // even_month_weekday: 짝수달 N째주 N요일 — evenWeekNth, evenWeekDay
   // irregular: 비정기 — nextDate로 지정한 날짜에만 표시
 
   function getNthWeekdayOfMonth(year, month, nth, weekday) {
@@ -597,16 +599,22 @@
       const diffDays = Math.round((target - baseDate) / 86400000);
       return diffDays >= 0 && target.getDay() === baseDate.getDay() && Math.floor(diffDays / 7) % interval === 0;
     }
-    if (type === "odd_even_month_day") {
-      const isOddMonth = (target.getMonth() + 1) % 2 === 1;
-      const day = isOddMonth ? c.oddMonthDay : c.evenMonthDay;
-      return target.getDate() === clampMonthDay(target.getFullYear(), target.getMonth(), day);
+    if (type === "odd_month_day") {
+      if ((target.getMonth() + 1) % 2 !== 1) return false;
+      return target.getDate() === clampMonthDay(target.getFullYear(), target.getMonth(), c.oddMonthDay);
     }
-    if (type === "odd_even_month_weekday") {
-      const isOddMonth = (target.getMonth() + 1) % 2 === 1;
-      const nth = isOddMonth ? c.oddWeekNth : c.evenWeekNth;
-      const weekday = isOddMonth ? c.oddWeekDay : c.evenWeekDay;
-      const d = getNthWeekdayOfMonth(target.getFullYear(), target.getMonth(), nth, weekday);
+    if (type === "even_month_day") {
+      if ((target.getMonth() + 1) % 2 !== 0) return false;
+      return target.getDate() === clampMonthDay(target.getFullYear(), target.getMonth(), c.evenMonthDay);
+    }
+    if (type === "odd_month_weekday") {
+      if ((target.getMonth() + 1) % 2 !== 1) return false;
+      const d = getNthWeekdayOfMonth(target.getFullYear(), target.getMonth(), c.oddWeekNth, c.oddWeekDay);
+      return d && dateStr(d) === ds;
+    }
+    if (type === "even_month_weekday") {
+      if ((target.getMonth() + 1) % 2 !== 0) return false;
+      const d = getNthWeekdayOfMonth(target.getFullYear(), target.getMonth(), c.evenWeekNth, c.evenWeekDay);
       return d && dateStr(d) === ds;
     }
     return false;
@@ -649,11 +657,15 @@
     if (type === "n_weekly") return `${c.weekInterval || 1}주마다 ${dayNames[c.weekDay]}요일`;
     if (type === "n_months") return `${c.monthInterval || 1}달마다`;
     if (type === "n_weeks") return `${c.onlyWeekInterval || 1}주마다`;
-    if (type === "odd_even_month_day") return `홀수달 ${c.oddMonthDay}일 / 짝수달 ${c.evenMonthDay}일`;
-    if (type === "odd_even_month_weekday") {
+    if (type === "odd_month_day") return `홀수달 ${c.oddMonthDay}일`;
+    if (type === "even_month_day") return `짝수달 ${c.evenMonthDay}일`;
+    if (type === "odd_month_weekday") {
       const oddNth = c.oddWeekNth === -1 ? "마지막" : c.oddWeekNth + "번째";
+      return `홀수달 ${oddNth} ${dayNames[c.oddWeekDay]}요일`;
+    }
+    if (type === "even_month_weekday") {
       const evenNth = c.evenWeekNth === -1 ? "마지막" : c.evenWeekNth + "번째";
-      return `홀수달 ${oddNth} ${dayNames[c.oddWeekDay]}요일 / 짝수달 ${evenNth} ${dayNames[c.evenWeekDay]}요일`;
+      return `짝수달 ${evenNth} ${dayNames[c.evenWeekDay]}요일`;
     }
     if (type === "irregular") return "비정기";
     if (type === "monthly_weekday") {
@@ -1019,10 +1031,10 @@
     $("f-month-interval").value = 2;
     $("f-only-week-interval").value = 2;
     $("f-odd-month-day").value = 1;
-    $("f-even-month-day").value = 15;
+    $("f-even-month-day").value = 2;
     $("f-odd-week-nth").value = 1;
     $("f-odd-week-day").value = 5;
-    $("f-even-week-nth").value = 3;
+    $("f-even-week-nth").value = 1;
     $("f-even-week-day").value = 5;
     $("goods-rows").innerHTML = "";
     goodsCnt = 0;
@@ -1068,10 +1080,10 @@
     $("f-month-interval").value = c.monthInterval || 2;
     $("f-only-week-interval").value = c.onlyWeekInterval || 2;
     $("f-odd-month-day").value = c.oddMonthDay || 1;
-    $("f-even-month-day").value = c.evenMonthDay || 15;
+    $("f-even-month-day").value = c.evenMonthDay || 2;
     $("f-odd-week-nth").value = c.oddWeekNth || 1;
     $("f-odd-week-day").value = c.oddWeekDay ?? 5;
-    $("f-even-week-nth").value = c.evenWeekNth || 3;
+    $("f-even-week-nth").value = c.evenWeekNth || 1;
     $("f-even-week-day").value = c.evenWeekDay ?? 5;
     $("goods-rows").innerHTML = "";
     goodsCnt = 0;
@@ -1154,12 +1166,14 @@
       const onlyWeekInterval = parseInt($("f-only-week-interval").value) || 1;
       if (onlyWeekInterval < 1) { showToast("주기는 1주 이상으로 입력해주세요", "err"); return; }
       cycleData.onlyWeekInterval = onlyWeekInterval;
-    } else if (cycleType === "odd_even_month_day") {
+    } else if (cycleType === "odd_month_day") {
       cycleData.oddMonthDay = parseInt($("f-odd-month-day").value) || 1;
+    } else if (cycleType === "even_month_day") {
       cycleData.evenMonthDay = parseInt($("f-even-month-day").value) || 1;
-    } else if (cycleType === "odd_even_month_weekday") {
+    } else if (cycleType === "odd_month_weekday") {
       cycleData.oddWeekNth = parseInt($("f-odd-week-nth").value);
       cycleData.oddWeekDay = parseInt($("f-odd-week-day").value);
+    } else if (cycleType === "even_month_weekday") {
       cycleData.evenWeekNth = parseInt($("f-even-week-nth").value);
       cycleData.evenWeekDay = parseInt($("f-even-week-day").value);
     } else if (cycleType === "irregular") {
@@ -1563,8 +1577,10 @@
             <option value="monthly_weekday">매달 N번째 요일</option>
             <option value="n_months">N달마다</option>
             <option value="n_weeks">N주마다</option>
-            <option value="odd_even_month_day">홀수달/짝수달 N일</option>
-            <option value="odd_even_month_weekday">홀수달/짝수달 N째주 요일</option>
+            <option value="odd_month_day">홀수달 N일</option>
+            <option value="even_month_day">짝수달 N일</option>
+            <option value="odd_month_weekday">홀수달 N째주 N요일</option>
+            <option value="even_month_weekday">짝수달 N째주 N요일</option>
             <option value="irregular">비정기</option>
           </select>
           <div class="cycle-panel active" data-panel="days">
@@ -1643,54 +1659,60 @@
               <span style="font-size:13px;color:var(--text2);">주마다 발송 (시작일 요일 기준)</span>
             </div>
           </div>
-          <div class="cycle-panel" data-panel="odd_even_month_day">
-            <div class="nth-row">
-              <span style="font-size:13px;color:var(--text2);align-self:center;">홀수달</span>
+          <div class="cycle-panel" data-panel="odd_month_day">
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <span style="font-size:13px;color:var(--text2);">홀수달</span>
               <input type="number" id="f-odd-month-day" min="1" max="31" value="1" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
-              <span style="font-size:13px;color:var(--text2);align-self:center;">짝수달</span>
-              <input type="number" id="f-even-month-day" min="1" max="31" value="15" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
+              <span style="font-size:13px;color:var(--text2);">일 발송</span>
             </div>
           </div>
-          <div class="cycle-panel" data-panel="odd_even_month_weekday">
-            <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
-              <div class="nth-row">
-                <span style="font-size:13px;color:var(--text2);align-self:center;">홀수달</span>
-                <select id="f-odd-week-nth">
-                  <option value="1">첫째</option>
-                  <option value="2">둘째</option>
-                  <option value="3">셋째</option>
-                  <option value="4">넷째</option>
-                  <option value="-1">마지막</option>
-                </select>
-                <select id="f-odd-week-day">
-                  <option value="0">일요일</option>
-                  <option value="1">월요일</option>
-                  <option value="2">화요일</option>
-                  <option value="3">수요일</option>
-                  <option value="4">목요일</option>
-                  <option value="5">금요일</option>
-                  <option value="6">토요일</option>
-                </select>
-              </div>
-              <div class="nth-row">
-                <span style="font-size:13px;color:var(--text2);align-self:center;">짝수달</span>
-                <select id="f-even-week-nth">
-                  <option value="1">첫째</option>
-                  <option value="2">둘째</option>
-                  <option value="3">셋째</option>
-                  <option value="4">넷째</option>
-                  <option value="-1">마지막</option>
-                </select>
-                <select id="f-even-week-day">
-                  <option value="0">일요일</option>
-                  <option value="1">월요일</option>
-                  <option value="2">화요일</option>
-                  <option value="3">수요일</option>
-                  <option value="4">목요일</option>
-                  <option value="5">금요일</option>
-                  <option value="6">토요일</option>
-                </select>
-              </div>
+          <div class="cycle-panel" data-panel="even_month_day">
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <span style="font-size:13px;color:var(--text2);">짝수달</span>
+              <input type="number" id="f-even-month-day" min="1" max="31" value="2" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
+              <span style="font-size:13px;color:var(--text2);">일 발송</span>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="odd_month_weekday">
+            <div class="nth-row">
+              <span style="font-size:13px;color:var(--text2);align-self:center;">홀수달</span>
+              <select id="f-odd-week-nth">
+                <option value="1">첫째</option>
+                <option value="2">둘째</option>
+                <option value="3">셋째</option>
+                <option value="4">넷째</option>
+                <option value="-1">마지막</option>
+              </select>
+              <select id="f-odd-week-day">
+                <option value="0">일요일</option>
+                <option value="1">월요일</option>
+                <option value="2">화요일</option>
+                <option value="3">수요일</option>
+                <option value="4">목요일</option>
+                <option value="5">금요일</option>
+                <option value="6">토요일</option>
+              </select>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="even_month_weekday">
+            <div class="nth-row">
+              <span style="font-size:13px;color:var(--text2);align-self:center;">짝수달</span>
+              <select id="f-even-week-nth">
+                <option value="1">첫째</option>
+                <option value="2">둘째</option>
+                <option value="3">셋째</option>
+                <option value="4">넷째</option>
+                <option value="-1">마지막</option>
+              </select>
+              <select id="f-even-week-day">
+                <option value="0">일요일</option>
+                <option value="1">월요일</option>
+                <option value="2">화요일</option>
+                <option value="3">수요일</option>
+                <option value="4">목요일</option>
+                <option value="5">금요일</option>
+                <option value="6">토요일</option>
+              </select>
             </div>
           </div>
         </div>
