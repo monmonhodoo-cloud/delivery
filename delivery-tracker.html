@@ -340,8 +340,8 @@
     cursor: pointer;
   }
 
-  .cycle-type-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
-  .cycle-tab { flex: 1; padding: 7px 4px; font-size: 12px; border: 0.5px solid var(--border-strong); border-radius: var(--radius); background: none; cursor: pointer; color: var(--text2); font-family: inherit; text-align: center; }
+  .cycle-type-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .cycle-tab { flex: 1 1 110px; padding: 7px 4px; font-size: 12px; border: 0.5px solid var(--border-strong); border-radius: var(--radius); background: none; cursor: pointer; color: var(--text2); font-family: inherit; text-align: center; }
   .cycle-tab.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent-dark); font-weight: 500; }
   .cycle-panel { display: none; }
   .cycle-panel.active { display: block; }
@@ -848,6 +848,15 @@
     } else if (cycleType === "weekly") {
       if (selectedWeekdays.length === 0) { showToast("요일을 최소 1개 선택해주세요", "err"); return; }
       cycleData.weekdays = [...selectedWeekdays];
+    } else if (cycleType === "monthly_day") {
+      const monthDay = parseInt($("f-month-day").value) || 1;
+      if (monthDay < 1 || monthDay > 31) { showToast("일자는 1~31 사이로 입력해주세요", "err"); return; }
+      cycleData.monthDay = monthDay;
+    } else if (cycleType === "n_weekly") {
+      const weekInterval = parseInt($("f-week-interval").value) || 1;
+      if (weekInterval < 1) { showToast("주기는 1주 이상으로 입력해주세요", "err"); return; }
+      cycleData.weekInterval = weekInterval;
+      cycleData.weekDay = parseInt($("f-n-week-day").value);
     } else if (cycleType === "monthly_weekday") {
       cycleData.weekNth = parseInt($("f-week-nth").value);
       cycleData.weekDay = parseInt($("f-week-day").value);
@@ -1146,6 +1155,8 @@
           <div class="cycle-type-tabs" style="margin-top:6px;">
             <button class="cycle-tab active" data-type="days" onclick="setCycleTab('days')">N일마다</button>
             <button class="cycle-tab" data-type="weekly" onclick="setCycleTab('weekly')">매주 요일</button>
+            <button class="cycle-tab" data-type="monthly_day" onclick="setCycleTab('monthly_day')">매달 N일마다</button>
+            <button class="cycle-tab" data-type="n_weekly" onclick="setCycleTab('n_weekly')">N주 N요일마다</button>
             <button class="cycle-tab" data-type="monthly_weekday" onclick="setCycleTab('monthly_weekday')">매달 N번째 요일</button>
           </div>
           <div class="cycle-panel active" data-panel="days">
@@ -1163,6 +1174,28 @@
               <button class="weekday-btn" onclick="toggleWeekday(this,4)">목</button>
               <button class="weekday-btn" onclick="toggleWeekday(this,5)">금</button>
               <button class="weekday-btn" onclick="toggleWeekday(this,6)">토</button>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="monthly_day">
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <span style="font-size:13px;color:var(--text2);">매달</span>
+              <input type="number" id="f-month-day" min="1" max="31" value="1" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
+              <span style="font-size:13px;color:var(--text2);">일마다 발송</span>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="n_weekly">
+            <div class="nth-row">
+              <input type="number" id="f-week-interval" min="1" value="2" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
+              <span style="font-size:13px;color:var(--text2);">주마다</span>
+              <select id="f-n-week-day">
+                <option value="0">일요일</option>
+                <option value="1">월요일</option>
+                <option value="2">화요일</option>
+                <option value="3">수요일</option>
+                <option value="4">목요일</option>
+                <option value="5">금요일</option>
+                <option value="6">토요일</option>
+              </select>
             </div>
           </div>
           <div class="cycle-panel" data-panel="monthly_weekday">
