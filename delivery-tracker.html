@@ -1269,15 +1269,15 @@
     if (!editingNoteKey) return;
     const note = deliveryNotes.find(n => n.id === editingNoteKey);
     const c = note ? customers.find(x => x.id === note.customerId) : null;
-    if (!confirm("???뚯감 硫붾え瑜???젣?좉퉴??")) return;
+    if (!confirm("이 회차 메모를 삭제할까요?")) return;
     setLoading(true);
     try {
       await deleteDeliveryNote(editingNoteKey);
-      if (c) logChange("delete", c.name, note.date + " ?뚯감 硫붾え ??젣");
+      if (c) logChange("delete", c.name, note.date + " 회차 메모 삭제");
       closeNoteModal();
-      showToast("?뚯감 硫붾え ??젣 ?꾨즺");
+      showToast("회차 메모 삭제 완료");
     } catch (e) {
-      showToast("??젣 ?ㅻ쪟: " + e.message, "err");
+      showToast("삭제 오류: " + e.message, "err");
     } finally { setLoading(false); }
   };
 
@@ -1327,15 +1327,15 @@
     try {
       const newActive = !c.active;
       await updateCustomer(id, { active: newActive });
-      logChange("pause", c.name, newActive ? "諛곗넚 ?ш컻" : "諛곗넚 ?쇱떆?뺤?");
-      showToast(c.active ? "諛곗넚 ?쇱떆?뺤?" : "諛곗넚 ?ш컻");
+      logChange("pause", c.name, newActive ? "배송 재개" : "배송 일시정지");
+      showToast(c.active ? "배송 일시정지" : "배송 재개");
     } catch (e) {
-      showToast("?ㅻ쪟: " + e.message, "err");
+      showToast("오류: " + e.message, "err");
     } finally { setLoading(false); }
   };
 
   window.confirmDelete = function(id, name) {
-    if (!confirm(`"${name}" 怨좉컼????젣?섏떆寃좎뼱??`)) return;
+    if (!confirm(`"${name}" 고객을 삭제하시겠어요?`)) return;
     doDelete(id);
   };
 
@@ -1515,7 +1515,7 @@
 
     <!-- Config notice (demo mode) -->
     <div class="config-notice" id="config-notice">
-      <strong>??Firebase 誘몄꽕???곹깭?낅땲??</strong>
+      <strong>Firebase 미설정 상태입니다.</strong>
       HTML ?뚯씪 ?곷떒??<code>firebaseConfig</code> 媛믪쓣 援먯껜?섎㈃ ?ㅼ떆媛??곕룞???쒖꽦?붾맗?덈떎.
       ?꾩옱????釉뚮씪?곗? 濡쒖뺄?먮쭔 ??λ맗?덈떎.
     </div>
@@ -1778,7 +1778,7 @@
         <div class="side-title" id="date-panel-title"></div>
         <div class="side-sub" id="date-panel-sub"></div>
       </div>
-      <button class="side-close" onclick="closeDatePanel()">횞</button>
+      <button class="side-close" onclick="closeDatePanel()">×</button>
     </div>
     <div class="side-list" id="date-panel-list"></div>
   </aside>
@@ -1792,8 +1792,8 @@
     <div class="form-group"><label id="modal-date-label">다음 배송일</label><input type="date" id="modal-date"></div>
     <div class="form-group" id="modal-cycle-group"><label>발송 주기 (일)</label><input type="number" id="modal-cycle" min="1"></div>
     <div class="modal-actions">
-      <button class="btn" onclick="closeModal()">痍⑥냼</button>
-      <button class="btn btn-primary" onclick="saveEdit()">???/button>
+      <button class="btn" onclick="closeModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveEdit()">저장</button>
     </div>
   </div>
 </div>
@@ -1804,6 +1804,7 @@
 
 </body>
 </html>
+
 
 
 
