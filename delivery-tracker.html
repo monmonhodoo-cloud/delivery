@@ -497,7 +497,7 @@
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const $ = id => document.getElementById(id);
-  const dateStr = d => d.toISOString().slice(0, 10);
+  const dateStr = d => { const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; };
   const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
   const parseDate = s => new Date(s + "T00:00:00");
   const DAYS = ["일","월","화","수","목","금","토"];
@@ -1258,6 +1258,7 @@
     // 클릭한 날짜가 있으면 그 날짜의 원래 예정일 찾기
     const displayedDate = clickedDs || getNextDelivery(c) || dateStr(new Date());
     const originalDate = clickedDs ? getOriginalScheduledDate(c, clickedDs) : displayedDate;
+    console.log("[openEdit]", { id, clickedDs, displayedDate, originalDate, overrides: c.oneTimeOverrides });
 
     $("modal-name").value = c.name;
     $("modal-original-date").value = originalDate;
@@ -1295,6 +1296,7 @@
     const isIrregular = (c.cycleType || "days") === "irregular";
 
     console.log("[saveEdit]", { newDate, origDate, applyAll, isIrregular, currentOverrides: c.oneTimeOverrides });
+    console.log("[saveEdit] IS_DEMO:", IS_DEMO, "db:", !!db);
 
     setLoading(true);
     try {
@@ -1323,6 +1325,9 @@
         }
         console.log("[saveEdit] saving overrides:", JSON.stringify(overrides));
         await updateCustomer(editingId, { oneTimeOverrides: overrides });
+        // localStorage 확인
+        try { console.log("[after save] localStorage dt_demo:", JSON.parse(localStorage.getItem("dt_demo")).find(x=>x.id===editingId)); } catch(e){}
+        console.log("[after save] customers array entry:", customers.find(x=>x.id===editingId));
         logChange("edit", c.name, `1회차 단독 변경 ${origDate} → ${newDate}`);
       }
       closeModal();
