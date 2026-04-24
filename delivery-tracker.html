@@ -288,8 +288,6 @@
   .month-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 1px;
-    background: var(--border);
     border: 0.5px solid var(--border);
     border-radius: var(--radius-lg);
     overflow: hidden;
@@ -301,16 +299,25 @@
     font-size: 11px;
     font-weight: 500;
     color: var(--text3);
+    border-right: 0.5px solid var(--border);
+    border-bottom: 0.5px solid var(--border);
   }
+  .month-header-cell:last-child { border-right: none; }
   .month-cell {
     background: var(--surface);
-    min-height: 90px;
+    min-height: 110px;
     padding: 6px;
     vertical-align: top;
+    border-right: 0.5px solid var(--border);
+    border-bottom: 0.5px solid var(--border);
+    box-sizing: border-box;
   }
+  .month-cell:nth-child(7n) { border-right: none; }
   .month-cell.other-month { background: var(--surface2); }
   .month-cell.today { background: #f0fdf8; }
-  .month-cell.holiday { background: #fff5f5; }
+  .month-cell.sun { background: rgba(163,45,45,0.04); }
+  .month-cell.sat { background: rgba(24,95,165,0.04); }
+  .month-cell.holiday { background: rgba(163,45,45,0.07) !important; }
   .month-cell.holiday .month-day-num { color: var(--danger) !important; }
   .day-card.holiday { background: #fff5f5; border-color: #f5c0c0; }
   .month-day-num {
@@ -338,6 +345,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     cursor: pointer;
+    line-height: 1.4;
   }
   .month-chip:hover { background: #9FE1CB; }
 
@@ -470,7 +478,7 @@
   import {
     getFirestore, collection, doc,
     addDoc, updateDoc, deleteDoc,
-    onSnapshot, query, orderBy
+    onSnapshot, query, orderBy, where, limit, getDocs
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -714,6 +722,8 @@
   function startRealtimeSync() {
     if (!db) return;
     setSyncStatus("connecting");
+
+    // customers 실시간 구독
     const q = query(collection(db, "customers"), orderBy("createdAt", "asc"));
     unsubscribe = onSnapshot(q,
       snapshot => {
@@ -727,6 +737,17 @@
         setSyncStatus("err");
         showToast("Firebase 연결 오류: " + err.message, "err");
       }
+    );
+
+    // deliveryNotes 실시간 구독 (변경 로그)
+    const qNotes = query(collection(db, "deliveryNotes"), orderBy("ts", "asc"));
+    onSnapshot(qNotes,
+      snapshot => {
+        changelogs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        updateChangeBadge();
+        if ($("changes-list")) renderChanges();
+      },
+      err => { console.warn("deliveryNotes 구독 오류:", err); }
     );
   }
 
@@ -848,9 +869,11 @@
       html += `<div class="month-cell ${dowClass} ${todayClass}${holClass}" onclick="openDatePanel('${ds}')" style="cursor:pointer;">
         <div class="month-day-num">${d}</div>`;
 
-      const max = 2;
+      const max = 4;
       deliveries.slice(0, max).forEach(c => {
-        html += `<div class="month-chip" onclick="event.stopPropagation();openEdit('${c.id}','${ds}')" title="${c.name} | ${c.goods.map(g=>g.name+' '+g.qty+g.unit).join(', ')}">${c.name}</div>`;
+        const goodsStr = (c.goods||[]).map(g=>g.name).join(', ');
+        const label = goodsStr ? `${c.name} (${goodsStr})` : c.name;
+        html += `<div class="month-chip" onclick="event.stopPropagation();openEdit('${c.id}','${ds}')" title="${c.name} | ${(c.goods||[]).map(g=>g.name+' '+g.qty+g.unit).join(', ')}">${label}</div>`;
       });
       if (deliveries.length > max) {
         html += `<div class="month-more" onclick="event.stopPropagation();openDatePanel('${ds}')">+${deliveries.length - max}명 더</div>`;
@@ -1376,33 +1399,47 @@
 
   // ── DateTime clock ───────────────────────────────────────────────────────
 
-  function todayKey() { return new Date().toISOString().slice(0,10); }
+  const CHANGES_KEY = "dt_changes";
+  let changelogs = []; // Firestore에서 실시간 로드된 변경 로그
+
+  function todayKey() {
+    const d = new Date();
+    return dateStr(d); // 로컬 시간 기준 (UTC 아님)
+  }
 
   let selectedChangeDate = todayKey();
 
   function loadChanges(date = selectedChangeDate) {
-    try {
-      const raw = localStorage.getItem(CHANGES_KEY);
-      if (!raw) return [];
-      const all = JSON.parse(raw);
-      return all.filter(c => c.date === date);
-    } catch { return []; }
+    const src = changelogs.length > 0 ? changelogs : (() => {
+      try { return JSON.parse(localStorage.getItem(CHANGES_KEY) || "[]"); } catch { return []; }
+    })();
+    if (date === "all") return [...src].sort((a,b) => (b.ts||0)-(a.ts||0));
+    return src.filter(c => c.date === date).sort((a,b) => (b.ts||0)-(a.ts||0));
   }
 
-  function logChange(type, name, desc) {
+  async function logChange(type, name, desc) {
+    const now = new Date();
+    const entry = {
+      date: todayKey(),
+      type, name, desc,
+      time: now.toTimeString().slice(0,8),
+      ts: Date.now()
+    };
+    // localStorage 백업 (항상)
     try {
       const raw = localStorage.getItem(CHANGES_KEY);
       const all = raw ? JSON.parse(raw) : [];
-      const now = new Date();
-      all.push({
-        date: todayKey(),
-        type, name, desc,
-        time: now.toTimeString().slice(0,8)
-      });
+      all.push(entry);
       localStorage.setItem(CHANGES_KEY, JSON.stringify(all.slice(-1000)));
-      updateChangeBadge();
-      if ($("changes-list")) renderChanges();
     } catch {}
+    // Firestore 저장 (연결된 경우)
+    if (db) {
+      try { await addDoc(collection(db, "deliveryNotes"), entry); } catch(e) { console.warn("logChange Firestore 저장 실패:", e); }
+    }
+    // changelogs 배열에 즉시 추가
+    changelogs.push(entry);
+    updateChangeBadge();
+    if ($("changes-list")) renderChanges();
   }
 
   function updateChangeBadge() {
@@ -1420,16 +1457,21 @@
     });
   }
 
+  window.showAllChanges = function() {
+    selectedChangeDate = "all";
+    const input = $("changes-picker");
+    if (input) input.value = "";
+    renderChanges();
+  };
+
   function renderChanges() {
     const input = $("changes-picker");
-    if (input) {
-      if (!input.value) input.value = selectedChangeDate;
-      selectedChangeDate = input.value || todayKey();
-    }
+    if (input && input.value) selectedChangeDate = input.value;
+    else if (input && !input.value && selectedChangeDate !== "all") selectedChangeDate = todayKey();
     const changes = loadChanges(selectedChangeDate);
     const list = $("changes-list");
     const dateEl = $("changes-date");
-    if (dateEl) dateEl.textContent = selectedChangeDate + " 변경 내역";
+    if (dateEl) dateEl.textContent = selectedChangeDate === "all" ? "전체 변경 내역" : selectedChangeDate + " 변경 내역";
     if (!list) return;
     if (changes.length === 0) {
       list.innerHTML = `<div class="changes-empty">선택한 날짜의 변경사항이 없어요</div>`;
@@ -1450,13 +1492,24 @@
   }
   window.renderChanges = renderChanges;
 
-  window.clearChanges = function() {
+  window.clearChanges = async function() {
     if (!confirm(selectedChangeDate + " 변경 기록을 지울까요?")) return;
+    // localStorage 삭제
     try {
       const raw = localStorage.getItem(CHANGES_KEY);
       const all = raw ? JSON.parse(raw) : [];
       localStorage.setItem(CHANGES_KEY, JSON.stringify(all.filter(c => c.date !== selectedChangeDate)));
     } catch {}
+    // Firestore 삭제
+    if (db) {
+      try {
+        const toDelete = changelogs.filter(c => c.date === selectedChangeDate && c.id);
+        for (const entry of toDelete) {
+          await deleteDoc(doc(db, "deliveryNotes", entry.id));
+        }
+      } catch(e) { console.warn("변경기록 삭제 오류:", e); }
+    }
+    changelogs = changelogs.filter(c => c.date !== selectedChangeDate);
     renderChanges();
     updateChangeBadge();
   };
@@ -1559,7 +1612,8 @@
     <div id="tab-changes" class="section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
         <div class="page-title" style="margin-bottom:0;">변경사항</div>
-        <div style="display:flex;gap:8px;align-items:center;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button class="btn" id="changes-all-btn" onclick="showAllChanges()" style="font-size:12px;">전체 보기</button>
           <input type="date" id="changes-picker" onchange="renderChanges()" style="padding:7px 10px;font-size:13px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;">
           <button class="btn" onclick="clearChanges()">기록 지우기</button>
         </div>
