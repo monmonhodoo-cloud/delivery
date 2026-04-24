@@ -310,6 +310,9 @@
   }
   .month-cell.other-month { background: var(--surface2); }
   .month-cell.today { background: #f0fdf8; }
+  .month-cell.holiday { background: #fff5f5; }
+  .month-cell.holiday .month-day-num { color: var(--danger) !important; }
+  .day-card.holiday { background: #fff5f5; border-color: #f5c0c0; }
   .month-day-num {
     font-size: 12px;
     font-weight: 500;
@@ -374,11 +377,14 @@
   .date-panel-sub { font-size: 12px; color: var(--text3); margin-bottom: 14px; }
   .date-panel-list { display: flex; flex-direction: column; gap: 10px; }
   .date-panel-item {
+    cursor: pointer;
+    transition: box-shadow 0.15s, border-color 0.15s;
     border: 0.5px solid var(--border);
     border-radius: var(--radius);
     padding: 12px;
     background: var(--surface);
   }
+  .date-panel-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-color: var(--accent); }
   .date-panel-item-name { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
   .date-panel-item-cycle { font-size: 12px; color: var(--text3); margin-bottom: 6px; }
   .date-panel-item-goods { font-size: 12px; color: var(--text2); line-height: 1.5; }
@@ -516,12 +522,14 @@
   }
 
   // ── Delivery logic ────────────────────────────────────────────────────────
-  // cycleType: "days" | "weekly" | "monthly_day" | "n_weekly" | "monthly_weekday" | "odd_month_day" | "even_month_day" | "odd_month_weekday" | "even_month_weekday" | "irregular"
+  // cycleType: "days" | "weekly" | "monthly_day" | "n_weekly" | "monthly_weekday" | "n_months" | "n_weeks" | "odd_month_day" | "even_month_day" | "odd_month_weekday" | "even_month_weekday" | "irregular"
   // days: N일마다
   // weekly: 매주 특정 요일(들) — weekdays: [0,1,...] (0=일)
   // monthly_day: 매달 N일 — monthDay: 1~31
   // n_weekly: N주마다 특정 요일 — weekInterval: 1~, weekDay: 0~6
   // monthly_weekday: 매달 N번째 요일 — weekNth: 1~5(-1=마지막), weekDay: 0~6
+  // n_months: N달마다 — monthInterval: 1~ (시작일 기준)
+  // n_weeks: N주마다 — weekIntervalOnly: 1~ (시작일 요일 기준)
   // irregular: 비정기 — nextDate로 지정한 날짜에만 표시
 
   function getNthWeekdayOfMonth(year, month, nth, weekday) {
@@ -539,21 +547,63 @@
     return new Date(year, month, date);
   }
 
+  // originalDeliveryDate(c, ds): ds 날짜에 원래 배송일이 있었는지 (override 무시)
+  function originalDeliveryDate(c, ds) {
+    if (!c.active) return false;
+    const type = c.cycleType || "days";
+    if (type === "irregular") return !!c.nextDate && c.nextDate === ds;
+    const start = parseDate(c.startDate);
+    const target = parseDate(ds);
+    if (target < start) return false;
+    if (c.nextDate && c.nextDate.length === 10) {
+      if (c.nextDate === ds) return true;
+      const nd = parseDate(c.nextDate);
+      if (target <= nd) return false;
+      return checkCycle(c, ds, nd);
+    }
+    return checkCycle(c, ds, start);
+  }
+
+  // getOriginalScheduledDate(c, ds): ds에 표시된 칩의 "원래 예정일"
+  // override된 날짜라면 override의 원래 키를 반환
+  function getOriginalScheduledDate(c, ds) {
+    const overrides = c.oneTimeOverrides || {};
+    for (const [origDate, newDate] of Object.entries(overrides)) {
+      if (newDate === ds) return origDate;
+    }
+    return ds; // override 없으면 그냥 ds
+  }
+
   function isDeliveryDay(c, ds) {
     if (!c.active) return false;
+    const type = c.cycleType || "days";
+    const overrides = c.oneTimeOverrides || {};
+
+    // 비정기
+    if (type === "irregular") {
+      return !!c.nextDate && c.nextDate === ds;
+    }
+
+    // oneTimeOverride 처리
+    // 1) ds가 override의 새 날짜(value)인 경우 → 원래 날짜에 배송이 있었으면 표시
+    for (const [origDate, newDate] of Object.entries(overrides)) {
+      if (newDate === ds) return originalDeliveryDate(c, origDate);
+    }
+    // 2) ds가 override의 원래 날짜(key)인 경우 → 무조건 숨김 (아래 주기 계산 타지 않도록 여기서 return)
+    if (Object.prototype.hasOwnProperty.call(overrides, ds)) return false;
+
+    // 일반 주기 계산
     const start = parseDate(c.startDate);
     const target = parseDate(ds);
     if (target < start) return false;
 
-    // 수동 변경일 우선 처리
-    if (c.nextDate) {
+    if (c.nextDate && c.nextDate.length === 10) {
       if (c.nextDate === ds) return true;
       const nd = parseDate(c.nextDate);
-      if ((c.cycleType || "days") === "irregular") return false;
       if (target <= nd) return false;
-      // nextDate 이후로는 원래 주기로 복귀
       return checkCycle(c, ds, nd);
     }
+
     return checkCycle(c, ds, start);
   }
 
@@ -594,6 +644,19 @@
       const d = getNthWeekdayOfMonth(target.getFullYear(), target.getMonth(), c.weekNth, c.weekDay);
       return d && dateStr(d) === ds;
     }
+    if (type === "n_months") {
+      if (target < baseDate) return false;
+      const monthInterval = c.monthInterval || 1;
+      const monthDiff = (target.getFullYear() - baseDate.getFullYear()) * 12 + (target.getMonth() - baseDate.getMonth());
+      const monthDay = Math.min(baseDate.getDate(), new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate());
+      return monthDiff >= 0 && monthDiff % monthInterval === 0 && target.getDate() === monthDay;
+    }
+    if (type === "n_weeks") {
+      if (target < baseDate) return false;
+      const weekIntervalOnly = c.weekIntervalOnly || 1;
+      const diffDays = Math.round((target - baseDate) / 86400000);
+      return target.getDay() === baseDate.getDay() && diffDays >= 0 && Math.floor(diffDays / 7) % weekIntervalOnly === 0;
+    }
     if (type === "odd_month_weekday" || type === "even_month_weekday") {
       if (target < baseDate) return false;
       const monthNumber = target.getMonth() + 1;
@@ -629,6 +692,8 @@
     if (type === "odd_month_day") return `홀수달 ${c.monthDay}일마다`;
     if (type === "even_month_day") return `짝수달 ${c.monthDay}일마다`;
     if (type === "n_weekly") return `${c.weekInterval || 1}주마다 ${dayNames[c.weekDay]}요일`;
+    if (type === "n_months") return `${c.monthInterval || 1}달마다`;
+    if (type === "n_weeks") return `${c.weekIntervalOnly || 1}주마다`;
     if (type === "irregular") return "비정기";
     if (type === "monthly_weekday") {
       const nth = c.weekNth === -1 ? "마지막" : c.weekNth + "번째";
@@ -689,12 +754,23 @@
   }
 
   async function updateCustomer(id, data) {
+    // 로컬 customers 배열 즉시 반영 (Firestore onSnapshot 딜레이 무관하게 캘린더 즉시 갱신)
+    const i = customers.findIndex(c => c.id === id);
+    if (i >= 0) {
+      if (data.oneTimeOverrides !== undefined) {
+        // oneTimeOverrides는 완전 교체
+        customers[i] = { ...customers[i], ...data, oneTimeOverrides: data.oneTimeOverrides };
+      } else {
+        customers[i] = { ...customers[i], ...data };
+      }
+    }
+    renderCalendar(); renderMonthly(); renderCustomers();
+
     if (db) {
+      // Firestore: oneTimeOverrides는 전체 필드 교체로 저장
       await updateDoc(doc(db, "customers", id), data);
     } else {
-      const i = customers.findIndex(c => c.id === id);
-      if (i >= 0) { customers[i] = { ...customers[i], ...data }; saveDemo(); }
-      renderCalendar(); renderCustomers();
+      saveDemo();
     }
   }
 
@@ -745,7 +821,10 @@
 
     let html = `<div class="month-grid">`;
     const dayNames = ["일","월","화","수","목","금","토"];
-    dayNames.forEach(d => { html += `<div class="month-header-cell">${d}</div>`; });
+    dayNames.forEach((d, i) => {
+      const color = i === 0 ? "color:var(--danger);" : i === 6 ? "color:#185FA5;" : "";
+      html += `<div class="month-header-cell" style="${color}">${d}</div>`;
+    });
 
     // 이전달 빈칸
     for (let i = 0; i < firstDay; i++) {
@@ -764,12 +843,14 @@
       const dowClass = dow === 0 ? "sun" : dow === 6 ? "sat" : "";
       const todayClass = isToday ? "today" : "";
 
-      html += `<div class="month-cell ${dowClass} ${todayClass}">
+      const isHol = isHoliday(ds);
+      const holClass = isHol ? " holiday" : "";
+      html += `<div class="month-cell ${dowClass} ${todayClass}${holClass}" onclick="openDatePanel('${ds}')" style="cursor:pointer;">
         <div class="month-day-num">${d}</div>`;
 
       const max = 2;
       deliveries.slice(0, max).forEach(c => {
-        html += `<div class="month-chip" onclick="openEdit('${c.id}')" title="${c.name} | ${c.goods.map(g=>g.name+' '+g.qty+g.unit).join(', ')}">${c.name}</div>`;
+        html += `<div class="month-chip" onclick="event.stopPropagation();openEdit('${c.id}','${ds}')" title="${c.name} | ${c.goods.map(g=>g.name+' '+g.qty+g.unit).join(', ')}">${c.name}</div>`;
       });
       if (deliveries.length > max) {
         html += `<div class="month-more" onclick="event.stopPropagation();openDatePanel('${ds}')">+${deliveries.length - max}명 더</div>`;
@@ -793,20 +874,62 @@
     $("monthly-grid").innerHTML = html;
   }
 
+  // ── Holidays ──────────────────────────────────────────────────────────────
+  const HOLIDAYS_KEY = "dt_holidays";
+
+  function loadHolidays() {
+    try { return JSON.parse(localStorage.getItem(HOLIDAYS_KEY) || "[]"); } catch { return []; }
+  }
+  function saveHolidays(arr) {
+    localStorage.setItem(HOLIDAYS_KEY, JSON.stringify(arr));
+  }
+  function isHoliday(ds) {
+    return loadHolidays().includes(ds);
+  }
+  window.toggleHoliday = function(ds) {
+    const holidays = loadHolidays();
+    const idx = holidays.indexOf(ds);
+    if (idx >= 0) holidays.splice(idx, 1);
+    else holidays.push(ds);
+    saveHolidays(holidays);
+    renderMonthly();
+    renderCalendar();
+    // 사이드패널 날짜 상태 업데이트
+    const btn = $("holiday-toggle-btn");
+    if (btn) {
+      const isNowHoliday = isHoliday(ds);
+      btn.textContent = isNowHoliday ? "✓ 휴일 지정됨 (취소)" : "휴일 지정하기";
+      btn.style.background = isNowHoliday ? "var(--danger-light)" : "";
+      btn.style.color = isNowHoliday ? "var(--danger)" : "";
+      btn.style.borderColor = isNowHoliday ? "var(--danger)" : "";
+    }
+  };
+
   // ── Calendar ──────────────────────────────────────────────────────────────
   window.openDatePanel = function(ds) {
     const targetDate = new Date(ds + "T00:00:00");
     const deliveries = customers.filter(c => getDeliveriesForDate(c, ds));
     const title = `${targetDate.getFullYear()}년 ${targetDate.getMonth() + 1}월 ${targetDate.getDate()}일`;
+    const holiday = isHoliday(ds);
     $("date-panel-title").textContent = title;
     $("date-panel-sub").textContent = `${deliveries.length}명의 배송이 있어요`;
+
+    // 휴일 지정 버튼
+    const btnArea = $("date-panel-holiday-btn");
+    if (btnArea) {
+      btnArea.innerHTML = `<button id="holiday-toggle-btn" class="btn ${holiday ? "btn-danger" : ""}" onclick="toggleHoliday('${ds}')"
+        style="${holiday ? "background:var(--danger-light);color:var(--danger);border-color:var(--danger);" : ""};width:100%;margin-bottom:12px;padding:8px;">
+        ${holiday ? "✓ 휴일 지정됨 (취소)" : "휴일 지정하기"}
+      </button>`;
+    }
+
     const list = $("date-panel-list");
     if (!deliveries.length) {
       list.innerHTML = `<div class="date-panel-empty">이 날짜에는 예정된 배송이 없어요.</div>`;
     } else {
       list.innerHTML = deliveries.map(c => {
         const goods = (c.goods || []).map(g => `${g.name} ${g.qty}${g.unit}`).join(", ");
-        return `<div class="date-panel-item">
+        return `<div class="date-panel-item" onclick="closeDatePanel();openEdit('${c.id}','${ds}')" title="클릭하여 배송일 변경">
           <div class="date-panel-item-name">${c.name}</div>
           <div class="date-panel-item-cycle">${cycleLabel(c)}</div>
           <div class="date-panel-item-goods">${goods || "상품 정보 없음"}</div>
@@ -819,30 +942,43 @@
   window.closeDatePanel = function() {
     $("date-panel-overlay").classList.remove("open");
   };
+  let weekOffset = 0;
+
+  window.changeWeek = function(dir) {
+    if (dir === 0) weekOffset = 0;
+    else weekOffset += dir;
+    renderCalendar();
+  };
+
   function renderCalendar() {
     const today = new Date(); today.setHours(0,0,0,0);
+    const base = addDays(today, weekOffset * 7);
     const grid = $("week-grid");
     grid.innerHTML = "";
     let todayCnt = 0, weekCnt = 0;
 
     for (let i = 0; i < 7; i++) {
-      const d = addDays(today, i);
+      const d = addDays(base, i);
       const ds = dateStr(d);
-      const isToday = i === 0;
+      const isToday = dateStr(d) === dateStr(today);
       const del = customers.filter(c => getDeliveriesForDate(c, ds));
       if (isToday) todayCnt = del.length;
       weekCnt += del.length;
 
+      const dow = d.getDay();
+      const isWeekend = dow === 0 || dow === 6;
+      const isHol = isHoliday(ds);
+      const isRed = isWeekend || isHol;
       const card = document.createElement("div");
-      card.className = "day-card" + (isToday ? " today" : "");
-      let html = `<div class="day-weekday">${DAYS[d.getDay()]}요일</div>
-                  <div class="day-date">${d.getMonth()+1}/${d.getDate()}</div>`;
+      card.className = "day-card" + (isToday ? " today" : "") + (isHol ? " holiday" : "");
+      let html = `<div class="day-weekday" style="${isRed ? "color:var(--danger);" : ""}">${DAYS[d.getDay()]}요일</div>
+                  <div class="day-date" style="${isRed && !isToday ? "color:var(--danger);" : ""}">${d.getMonth()+1}/${d.getDate()}</div>`;
       if (del.length === 0) {
         html += `<div class="no-delivery">배송 없음</div>`;
       } else {
         del.forEach(c => {
           const goods = c.goods.map(g => `${g.name} ${g.qty}${g.unit}`).join(", ");
-          html += `<div class="delivery-chip" onclick="openEdit('${c.id}')">
+          html += `<div class="delivery-chip" onclick="openEdit('${c.id}','${ds}')">
             <div class="chip-name">${c.name}</div>
             <div class="chip-goods">${goods}</div>
           </div>`;
@@ -850,6 +986,16 @@
       }
       card.innerHTML = html;
       grid.appendChild(card);
+    }
+
+    const startD = base;
+    const endD = addDays(base, 6);
+    const titleEl = $("week-nav-title");
+    if (titleEl) {
+      if (weekOffset === 0) titleEl.textContent = "이번 주";
+      else if (weekOffset === -1) titleEl.textContent = "지난 주";
+      else if (weekOffset === 1) titleEl.textContent = "다음 주";
+      else titleEl.textContent = `${startD.getMonth()+1}/${startD.getDate()} – ${endD.getMonth()+1}/${endD.getDate()}`;
     }
 
     $("stat-today").textContent = todayCnt + "건";
@@ -897,7 +1043,22 @@
           <span class="cust-grid-label">발송 주기</span><span class="cust-grid-val">${cycleLabel(c)}</span>
           <span class="cust-grid-label">시작일</span><span class="cust-grid-val">${c.startDate}</span>
         </div>
-        ${next ? `<div class="next-box"><span class="next-box-label">다음 배송일</span><span class="next-box-date">${next}</span></div>` : ""}
+        ${next ? `<div class="next-box">
+          <div>
+            <div class="next-box-label">다음 배송일</div>
+            ${(()=>{
+              const overrides = c.oneTimeOverrides || {};
+              const origEntry = Object.entries(overrides).find(([k,v]) => v === next || k === next);
+              if (origEntry && origEntry[1] !== origEntry[0]) {
+                const origDate = origEntry[0];
+                const changedDate = origEntry[1];
+                return `<div style="font-size:11px;color:var(--text3);text-decoration:line-through;margin-top:1px;">${origDate} (원래 예정)</div>`;
+              }
+              return '';
+            })()}
+          </div>
+          <span class="next-box-date">${next}</span>
+        </div>` : ""}
         <div class="cust-actions">
           <button class="btn" onclick="openCustomerEdit('${c.id}')">수정</button>
           <button class="btn" onclick="openEdit('${c.id}')">배송일 변경</button>
@@ -1087,16 +1248,36 @@
   };
 
   // ── Edit modal ────────────────────────────────────────────────────────────
-  window.openEdit = function(id) {
+  // openEdit(id, clickedDs): clickedDs = 캘린더에서 클릭한 날짜 (없으면 다음 배송일 기준)
+  window.openEdit = function(id, clickedDs) {
     editingId = id;
     const c = customers.find(x => x.id === id);
     if (!c) return;
-    $("modal-name").value = c.name;
     const isIrregular = (c.cycleType || "days") === "irregular";
-    $("modal-date-label").textContent = isIrregular ? "표시할 배송일" : "다음 배송일";
-    $("modal-cycle-group").style.display = isIrregular ? "none" : "block";
-    $("modal-date").value = c.nextDate || getNextDelivery(c) || dateStr(new Date());
+
+    // 클릭한 날짜가 있으면 그 날짜의 원래 예정일 찾기
+    const displayedDate = clickedDs || getNextDelivery(c) || dateStr(new Date());
+    const originalDate = clickedDs ? getOriginalScheduledDate(c, clickedDs) : displayedDate;
+
+    $("modal-name").value = c.name;
+    $("modal-original-date").value = originalDate;
+    $("modal-date").value = displayedDate;
     $("modal-cycle").value = c.cycle;
+
+    // 원래 배송일 표시 (단독 변경된 경우에만 다르게 보임)
+    const origBox = $("modal-original-box");
+    if (originalDate !== displayedDate) {
+      origBox.style.display = "block";
+      $("modal-original-display").textContent = originalDate + " (원래 예정일)";
+    } else {
+      origBox.style.display = "none";
+    }
+
+    $("modal-date-label").textContent = isIrregular ? "표시할 배송일" : "변경 배송일";
+    $("modal-cycle-group").style.display = (isIrregular || !clickedDs) ? "none" : "none"; // 주기 필드 숨김 (체크박스로 대체)
+    $("modal-apply-all").checked = false;
+    $("modal-apply-all-group").style.display = isIrregular ? "none" : "block";
+
     $("edit-overlay").classList.add("open");
   };
 
@@ -1106,17 +1287,48 @@
   };
 
   window.saveEdit = async function() {
-    const nextDate = $("modal-date").value;
-    const cycle = parseInt($("modal-cycle").value) || 7;
+    const newDate = $("modal-date").value;
+    const origDate = $("modal-original-date").value;
+    const applyAll = $("modal-apply-all").checked;
     const c = customers.find(x => x.id === editingId);
-    const isIrregular = c && (c.cycleType || "days") === "irregular";
+    if (!c) return;
+    const isIrregular = (c.cycleType || "days") === "irregular";
+
+    console.log("[saveEdit]", { newDate, origDate, applyAll, isIrregular, currentOverrides: c.oneTimeOverrides });
+
     setLoading(true);
     try {
-      await updateCustomer(editingId, isIrregular ? { nextDate } : { nextDate, cycle });
-      if (c) logChange("edit", c.name, (isIrregular ? "비정기 배송일 지정 → " : "배송일 변경 → ") + nextDate);
+      if (isIrregular) {
+        await updateCustomer(editingId, { nextDate: newDate });
+        logChange("edit", c.name, "비정기 배송일 지정 → " + newDate);
+      } else if (applyAll) {
+        const overrides = { ...(c.oneTimeOverrides || {}) };
+        for (const k of Object.keys(overrides)) {
+          if (k >= origDate) delete overrides[k];
+        }
+        await updateCustomer(editingId, { nextDate: newDate, oneTimeOverrides: overrides });
+        logChange("edit", c.name, "전체 주기 변경 → " + newDate);
+      } else {
+        // 1회차 단독 변경
+        const overrides = { ...(c.oneTimeOverrides || {}) };
+        let key = origDate;
+        for (const [k, v] of Object.entries(overrides)) {
+          if (v === origDate) { key = k; break; }
+        }
+        console.log("[saveEdit] override key:", key, "→", newDate);
+        if (newDate === key) {
+          delete overrides[key];
+        } else {
+          overrides[key] = newDate;
+        }
+        console.log("[saveEdit] saving overrides:", JSON.stringify(overrides));
+        await updateCustomer(editingId, { oneTimeOverrides: overrides });
+        logChange("edit", c.name, `1회차 단독 변경 ${origDate} → ${newDate}`);
+      }
       closeModal();
       showToast("저장됐어요");
     } catch (e) {
+      console.error("[saveEdit error]", e);
       showToast("저장 오류: " + e.message, "err");
     } finally { setLoading(false); }
   };
@@ -1308,7 +1520,15 @@
 
     <!-- Calendar tab -->
     <div id="tab-calendar" class="section active">
-      <div class="page-title">주간 배송 현황</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div class="page-title" style="margin-bottom:0;">주간 배송 현황</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button class="btn" onclick="changeWeek(-1)">◀ 이전</button>
+          <span id="week-nav-title" style="font-size:13px;font-weight:500;color:var(--text2);min-width:52px;text-align:center;">이번 주</span>
+          <button class="btn" onclick="changeWeek(0)">오늘</button>
+          <button class="btn" onclick="changeWeek(1)">다음 ▶</button>
+        </div>
+      </div>
       <div class="summary-bar">
         <div class="stat-card"><div class="stat-label">오늘 배송</div><div class="stat-val accent" id="stat-today">0건</div></div>
         <div class="stat-card"><div class="stat-label">이번 주 총 배송</div><div class="stat-val" id="stat-week">0건</div></div>
@@ -1377,6 +1597,8 @@
             <option value="monthly_day">매달 N일마다</option>
             <option value="n_weekly">N주 N요일마다</option>
             <option value="monthly_weekday">매달 N번째 요일</option>
+            <option value="n_months">N달마다</option>
+            <option value="n_weeks">N주마다</option>
             <option value="odd_month_day">홀수달 N일</option>
             <option value="even_month_day">짝수달 N일</option>
             <option value="odd_month_weekday">홀수달 N째주 N요일</option>
@@ -1448,14 +1670,79 @@
             </div>
           </div>
         </div>
-        <div class="goods-section">
+          <div class="cycle-panel" data-panel="n_months">
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <input type="number" id="f-month-interval" min="1" value="2" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
+              <span style="font-size:13px;color:var(--text2);">달마다 발송</span>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="n_weeks">
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <input type="number" id="f-week-interval-only" min="1" value="2" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
+              <span style="font-size:13px;color:var(--text2);">주마다 발송</span>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="odd_month_day">
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <span style="font-size:13px;color:var(--text2);">홀수달</span>
+              <input type="number" id="f-odd-month-day" min="1" max="31" value="1" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
+              <span style="font-size:13px;color:var(--text2);">일마다 발송</span>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="even_month_day">
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <span style="font-size:13px;color:var(--text2);">짝수달</span>
+              <input type="number" id="f-even-month-day" min="1" max="31" value="1" style="width:80px;padding:8px 10px;font-size:14px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);">
+              <span style="font-size:13px;color:var(--text2);">일마다 발송</span>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="odd_month_weekday">
+            <div class="nth-row">
+              <select id="f-odd-week-nth">
+                <option value="1">첫째</option>
+                <option value="2">둘째</option>
+                <option value="3">셋째</option>
+                <option value="4">넷째</option>
+                <option value="-1">마지막</option>
+              </select>
+              <select id="f-odd-week-day">
+                <option value="0">일요일</option>
+                <option value="1">월요일</option>
+                <option value="2">화요일</option>
+                <option value="3">수요일</option>
+                <option value="4">목요일</option>
+                <option value="5">금요일</option>
+                <option value="6">토요일</option>
+              </select>
+            </div>
+          </div>
+          <div class="cycle-panel" data-panel="even_month_weekday">
+            <div class="nth-row">
+              <select id="f-even-week-nth">
+                <option value="1">첫째</option>
+                <option value="2">둘째</option>
+                <option value="3">셋째</option>
+                <option value="4">넷째</option>
+                <option value="-1">마지막</option>
+              </select>
+              <select id="f-even-week-day">
+                <option value="0">일요일</option>
+                <option value="1">월요일</option>
+                <option value="2">화요일</option>
+                <option value="3">수요일</option>
+                <option value="4">목요일</option>
+                <option value="5">금요일</option>
+                <option value="6">토요일</option>
+              </select>
+            </div>
+          </div>
           <label>주문 상품 *</label>
           <div id="goods-rows"></div>
           <button class="add-goods-btn" onclick="addGoodsRow()">+ 상품 추가</button>
         </div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn" id="cancel-edit-btn" onclick="cancelCustomerEdit()" style="display:none;flex:1;padding:11px;">취소</button>
-          <button class="btn btn-primary" id="submit-customer-btn" onclick="submitCustomer()" style="flex:2;padding:11px;">등록하기</button>
+        <div style="margin-top:20px;padding-top:16px;border-top:0.5px solid var(--border);">
+          <button class="btn" id="cancel-edit-btn" onclick="cancelCustomerEdit()" style="display:none;width:100%;padding:10px;font-size:13px;margin-bottom:8px;">취소</button>
+          <button class="btn btn-primary" id="submit-customer-btn" onclick="submitCustomer()" style="width:100%;padding:10px;font-size:13px;font-weight:600;letter-spacing:0.01em;">등록하기</button>
         </div>
       </div>
     </div>
@@ -1470,6 +1757,7 @@
       <button class="btn" onclick="closeDatePanel()">닫기</button>
     </div>
     <div class="date-panel-sub" id="date-panel-sub"></div>
+    <div id="date-panel-holiday-btn"></div>
     <div class="date-panel-list" id="date-panel-list"></div>
   </aside>
 </div>
@@ -1479,8 +1767,19 @@
   <div class="modal">
     <h3>배송 일정 변경</h3>
     <div class="form-group"><label>고객명</label><input type="text" id="modal-name" readonly></div>
-    <div class="form-group"><label id="modal-date-label">다음 배송일</label><input type="date" id="modal-date"></div>
-    <div class="form-group" id="modal-cycle-group"><label>발송 주기 (일)</label><input type="number" id="modal-cycle" min="1"></div>
+    <div id="modal-original-box" style="display:none;background:var(--surface2);border-radius:var(--radius);padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--text3);" id="modal-original-box">
+      <span id="modal-original-display"></span>
+    </div>
+    <input type="hidden" id="modal-original-date">
+    <div class="form-group"><label id="modal-date-label">변경 배송일</label><input type="date" id="modal-date"></div>
+    <div class="form-group" id="modal-cycle-group" style="display:none;"><label>발송 주기 (일)</label><input type="number" id="modal-cycle" min="1"></div>
+    <div id="modal-apply-all-group" style="margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text2);">
+        <input type="checkbox" id="modal-apply-all" style="width:15px;height:15px;accent-color:var(--accent);">
+        이번 회차부터 이후 배송도 모두 이 날짜 기준으로 변경
+      </label>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px;margin-left:23px;">체크 안 하면 이번 1회차만 변경됩니다</div>
+    </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal()">취소</button>
       <button class="btn btn-primary" onclick="saveEdit()">저장</button>
@@ -1494,6 +1793,13 @@
 
 </body>
 </html>
+
+
+
+
+
+
+
 
 
 
