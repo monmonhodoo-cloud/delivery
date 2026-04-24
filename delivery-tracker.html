@@ -191,6 +191,7 @@
   .btn-danger:hover { background: var(--danger-light); }
   .btn-primary { background: var(--accent); color: white; border-color: var(--accent); font-weight: 500; }
   .btn-primary:hover { background: #0F6E56; }
+  .changes-range-btn { transition: background 0.15s, color 0.15s, border-color 0.15s; }
 
   /* Form */
   .form-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 24px; max-width: 600px; }
@@ -815,7 +816,7 @@
     if (name === "calendar") renderCalendar();
     if (name === "monthly") renderMonthly();
     if (name === "customers") renderCustomers();
-    if (name === "changes") renderChanges();
+    if (name === "changes") { setChangeRange(changeRange || "today"); }
     if (name === "add" && !editingCustomerId) initForm();
     updateChangeBadge();
   };
@@ -1457,21 +1458,53 @@
     });
   }
 
-  window.showAllChanges = function() {
-    selectedChangeDate = "all";
-    const input = $("changes-picker");
-    if (input) input.value = "";
+  let changeRange = "today"; // today | yesterday | week | all
+
+  window.setChangeRange = function(range) {
+    changeRange = range;
+    // 버튼 active 스타일
+    ["today","yesterday","week","all"].forEach(r => {
+      const btn = $("crb-" + r);
+      if (!btn) return;
+      btn.style.background = r === range ? "var(--accent)" : "";
+      btn.style.color = r === range ? "white" : "";
+      btn.style.borderColor = r === range ? "var(--accent)" : "";
+    });
     renderChanges();
   };
 
+  function getChangeDateRange() {
+    const today = new Date();
+    const todayStr = dateStr(today);
+    if (changeRange === "today") return [todayStr, todayStr];
+    if (changeRange === "yesterday") {
+      const y = dateStr(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1));
+      return [y, y];
+    }
+    if (changeRange === "week") {
+      const w = dateStr(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6));
+      return [w, todayStr];
+    }
+    return [null, null]; // all
+  }
+
   function renderChanges() {
-    const input = $("changes-picker");
-    if (input && input.value) selectedChangeDate = input.value;
-    else if (input && !input.value && selectedChangeDate !== "all") selectedChangeDate = todayKey();
-    const changes = loadChanges(selectedChangeDate);
+    const [from, to] = getChangeDateRange();
+    const src = changelogs.length > 0 ? changelogs : (() => {
+      try { return JSON.parse(localStorage.getItem(CHANGES_KEY) || "[]"); } catch { return []; }
+    })();
+    let changes;
+    if (!from && !to) {
+      changes = [...src].sort((a,b) => (b.ts||0)-(a.ts||0));
+    } else if (from === to) {
+      changes = src.filter(c => c.date === from).sort((a,b) => (b.ts||0)-(a.ts||0));
+    } else {
+      changes = src.filter(c => c.date >= from && c.date <= to).sort((a,b) => (b.ts||0)-(a.ts||0));
+    }
     const list = $("changes-list");
     const dateEl = $("changes-date");
-    if (dateEl) dateEl.textContent = selectedChangeDate === "all" ? "전체 변경 내역" : selectedChangeDate + " 변경 내역";
+    const labels = { today:"오늘", yesterday:"어제", week:"최근 일주일", all:"전체" };
+    if (dateEl) dateEl.textContent = (labels[changeRange] || "") + " 변경 내역";
     if (!list) return;
     if (changes.length === 0) {
       list.innerHTML = `<div class="changes-empty">선택한 날짜의 변경사항이 없어요</div>`;
@@ -1612,10 +1645,11 @@
     <div id="tab-changes" class="section">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
         <div class="page-title" style="margin-bottom:0;">변경사항</div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <button class="btn" id="changes-all-btn" onclick="showAllChanges()" style="font-size:12px;">전체 보기</button>
-          <input type="date" id="changes-picker" onchange="renderChanges()" style="padding:7px 10px;font-size:13px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;">
-          <button class="btn" onclick="clearChanges()">기록 지우기</button>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="btn changes-range-btn" id="crb-today" onclick="setChangeRange('today')" style="font-size:12px;">오늘</button>
+          <button class="btn changes-range-btn" id="crb-yesterday" onclick="setChangeRange('yesterday')" style="font-size:12px;">어제</button>
+          <button class="btn changes-range-btn" id="crb-week" onclick="setChangeRange('week')" style="font-size:12px;">일주일</button>
+          <button class="btn changes-range-btn" id="crb-all" onclick="setChangeRange('all')" style="font-size:12px;">전체</button>
         </div>
       </div>
       <div id="changes-date" style="font-size:13px;color:var(--text3);margin-bottom:16px;"></div>
