@@ -112,7 +112,7 @@
   .stat-val.accent { color: var(--accent); }
 
   /* Week grid */
-  .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+  .week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
   .day-card {
     background: var(--surface);
     border: 0.5px solid var(--border);
@@ -288,7 +288,7 @@
   /* Monthly calendar */
   .month-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     border: 0.5px solid var(--border);
     border-radius: var(--radius-lg);
     overflow: hidden;
@@ -300,6 +300,7 @@
     font-size: 11px;
     font-weight: 500;
     color: var(--text3);
+    min-width: 0;
     border-right: 0.5px solid var(--border);
     border-bottom: 0.5px solid var(--border);
   }
@@ -312,6 +313,7 @@
     border-right: 0.5px solid var(--border);
     border-bottom: 0.5px solid var(--border);
     box-sizing: border-box;
+    min-width: 0;
   }
   .month-cell:nth-child(7n) { border-right: none; }
   .month-cell.other-month { background: var(--surface2); }
@@ -347,6 +349,7 @@
     text-overflow: ellipsis;
     cursor: pointer;
     line-height: 1.4;
+    max-width: 100%;
   }
   .month-chip:hover { background: #9FE1CB; }
 
